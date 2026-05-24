@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SkyOps Agent — Network Intelligence Dashboard</title>
+  <meta name="description" content="Real-time IoT mesh network monitoring powered by Hybrid AI. Autonomous anomaly detection with multi-agent orchestration.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>◈</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header" id="header">
+    <div class="header-left">
+      <div class="logo">
+        <span class="logo-icon">◈</span>
+        <div class="logo-text">
+          <h1>Sky<span class="accent">Ops</span> Agent</h1>
+          <p class="logo-sub">Autonomous Network Intelligence</p>
+        </div>
+      </div>
+      <span class="live-badge" id="liveBadge"><span class="live-dot"></span> LIVE</span>
+    </div>
+    <div class="header-right">
+      <div class="scenario-info">
+        <span class="scenario-label">Demo Scenario</span>
+        <span class="scenario-step" id="scenarioStep">Step 0/18</span>
+      </div>
+      <div class="clock" id="clock"></div>
+    </div>
+  </header>
+
+  <!-- KPI Stats Bar -->
+  <div class="kpi-bar" id="kpiBar">
+    <div class="kpi-card">
+      <div class="kpi-icon">📊</div>
+      <div class="kpi-content">
+        <span class="kpi-value" id="kpiTotalEvents">0</span>
+        <span class="kpi-label">Total Events</span>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">⚠️</div>
+      <div class="kpi-content">
+        <span class="kpi-value kpi-danger" id="kpiAnomalies">0</span>
+        <span class="kpi-label">Anomalies</span>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">✅</div>
+      <div class="kpi-content">
+        <span class="kpi-value kpi-success" id="kpiUptime">100%</span>
+        <span class="kpi-label">Network Uptime</span>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">📡</div>
+      <div class="kpi-content">
+        <span class="kpi-value" id="kpiActiveNodes">5/5</span>
+        <span class="kpi-label">Active Nodes</span>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">🤖</div>
+      <div class="kpi-content">
+        <span class="kpi-value kpi-accent" id="kpiDetectionMethod">—</span>
+        <span class="kpi-label">Last Detection</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Dashboard Grid -->
+  <main class="dashboard-grid" id="dashboardGrid">
+
+    <!-- Network Topology Map -->
+    <section class="card card--topology" id="topologyCard">
+      <div class="card-header">
+        <h2>🗺️ Network Topology</h2>
+        <span class="card-badge">RPL Mesh • 5 Nodes</span>
+      </div>
+      <div class="topology-container" id="topologyContainer">
+        <svg id="topologySvg" viewBox="0 0 500 380" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="4" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+            <filter id="glowStrong">
+              <feGaussianBlur stdDeviation="8" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+            <linearGradient id="linkGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" style="stop-color:#f97316;stop-opacity:0.6"/>
+              <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:0.6"/>
+            </linearGradient>
+          </defs>
+          <!-- Links and nodes rendered by JS -->
+          <g id="linksGroup"></g>
+          <g id="nodesGroup"></g>
+        </svg>
+      </div>
+    </section>
+
+    <!-- Node Health Gauges -->
+    <section class="card card--gauges" id="gaugesCard">
+      <div class="card-header">
+        <h2>🏥 Node Health Scores</h2>
+        <span class="card-badge" id="avgHealth">Avg: 100</span>
+      </div>
+      <div class="gauges-container" id="gaugesContainer">
+        <!-- 5 gauges rendered by JS -->
+      </div>
+    </section>
+
+    <!-- Live Event Feed -->
+    <section class="card card--feed" id="feedCard">
+      <div class="card-header">
+        <h2>📋 Live Event Feed</h2>
+        <span class="card-badge feed-count" id="feedCount">0 events</span>
+      </div>
+      <div class="feed-container" id="feedContainer">
+        <div class="feed-empty">Waiting for events...</div>
+      </div>
+    </section>
+
+    <!-- Alert History -->
+    <section class="card card--alerts" id="alertsCard">
+      <div class="card-header">
+        <h2>🔔 Alert History</h2>
+        <span class="card-badge alert-count" id="alertCount">0</span>
+      </div>
+      <div class="alerts-container" id="alertsContainer">
+        <div class="alerts-empty">No alerts yet</div>
+      </div>
+    </section>
+
+    <!-- Detection Method Split -->
+    <section class="card card--detection" id="detectionCard">
+      <div class="card-header">
+        <h2>🤖 Detection Methods</h2>
+      </div>
+      <div class="detection-container" id="detectionContainer">
+        <div class="donut-chart" id="donutChart">
+          <svg viewBox="0 0 200 200" id="donutSvg">
+            <circle cx="100" cy="100" r="70" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="24"/>
+            <circle cx="100" cy="100" r="70" fill="none" stroke="#f97316" stroke-width="24" stroke-dasharray="0 440" id="donutRule" transform="rotate(-90 100 100)"/>
+            <circle cx="100" cy="100" r="70" fill="none" stroke="#3b82f6" stroke-width="24" stroke-dasharray="0 440" id="donutLLM" transform="rotate(-90 100 100)"/>
+          </svg>
+          <div class="donut-center">
+            <span class="donut-total" id="donutTotal">0</span>
+            <span class="donut-label">detections</span>
+          </div>
+        </div>
+        <div class="detection-legend">
+          <div class="legend-item"><span class="legend-dot" style="background:#f97316"></span>Rule Engine <span id="ruleCount">0</span></div>
+          <div class="legend-item"><span class="legend-dot" style="background:#3b82f6"></span>LLM Agent <span id="llmCount">0</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Anomaly Timeline -->
+    <section class="card card--timeline" id="timelineCard">
+      <div class="card-header">
+        <h2>⏱️ Anomaly Timeline</h2>
+        <span class="card-badge">18-Step Scenario</span>
+      </div>
+      <div class="timeline-container" id="timelineContainer">
+        <div class="timeline-track" id="timelineTrack">
+          <!-- Timeline dots rendered by JS -->
+        </div>
+        <div class="timeline-labels">
+          <span>00:00</span>
+          <span>01:00</span>
+          <span>02:00</span>
+          <span>03:00</span>
+          <span>04:50</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-left">
+      <span>◈ SkyOps Agent — Autonomous Network Intelligence, Powered by Hybrid AI</span>
+    </div>
+    <div class="footer-right">
+      <span class="footer-tech">n8n • Groq LLM • RPL Mesh • Telegram</span>
+      <span class="footer-divider">|</span>
+      <span>Built with <span class="accent">SkyStudio</span> Workflow Philosophy</span>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,353 @@
+SkyOps Agent — Proje Durum Raporu
+Proje Bağlamı
+Ben 4. sınıf Yazılım Mühendisliği öğrencisiyim. Aynı anda iki hedefi birden karşılamak için bu projeyi geliştiriyorum:
+
+Üniversite IoT dersi için akademik proje
+SKYMOD adlı İzmir merkezli Türk Generative AI startup'ının mülakat sürecinde, onların istediği "n8n kullanarak ürünlerine benzer bir AI asistanı geliştir ve linkini paylaş" görevini tamamlamak
+
+SKYMOD'un ürünü SkyStudio — enterprise şirketlere (Anadolu Isuzu, Derimod, Bakioğlu, Dardanel) AI workflow otomasyonu satıyorlar. Vizyonları: "Secure. Work. AI."
+
+Projenin Adı ve Konsepti
+SkyOps Agent — Autonomous Network Intelligence, Powered by Hybrid AI
+Cooja (Contiki-NG) simülatöründe çalışan RPL tabanlı bir IoT mesh ağından gelen telemetri loglarını gerçek zamanlı olarak analiz eden, anomalileri tespit eden ve otonom olarak Telegram üzerinden alert üreten multi-node AI agent sistemi.
+Neden bu konsept SKYMOD için güçlü: SKYMOD'un SkyStudio Workflow ürünü tam olarak bunu yapıyor — veri al, AI ile analiz et, otonom aksiyon al. Biz bunu IoT/NetOps domain'inde n8n üzerinde implement ettik.
+
+Teknik Altyapı
+Çalışma ortamı:
+
+Windows 11 + WSL2 (Ubuntu) + Docker Desktop
+Contiki-NG resmi Docker image'ı (contiker/contiki-ng)
+WSLg ile Cooja GUI grafik arayüzü
+Python 3.13 (uv ile yönetilen virtual env)
+n8n local Docker container (docker run -d --name n8n_netops -p 5678:5678)
+
+Simülasyon topolojisi:
+
+1 adet Border Router (kök düğüm, ID:1)
+4 adet UDP Sender istemci düğüm (ID:2, 3, 4, 5)
+RPL mesh protokolü, LoWPAN ortamı
+Toplam 5 node
+
+
+Neden Mock Data Kullanıyoruz — Mimari Karar
+Temel sorun: Cooja simülatörü tamamen local bir ortamda çalışıyor. Gerçek Cooja logları sadece kendi bilgisayarımda üretilebiliyor. Bu durum iki kritik probleme yol açıyor:
+
+Erişilebilirlik: Jüri veya SKYMOD mühendisleri sistemi test etmek istediğinde bilgisayarımın açık ve Cooja'nın çalışıyor olması gerekiyor. Bu güvenilmez ve profesyonel değil.
+Demo kontrolü: Canlı demoda hangi anomalinin ne zaman çıkacağını bilemiyoruz, bu da sunum sırasında risk oluşturuyor.
+
+Çözüm — İki katmanlı mimari:
+Gerçek Sistem (lokal, development):
+Cooja → log_forwarder.py → n8n local webhook
+
+Demo/Production Sistemi (cloud, 7/24 erişilebilir):
+SkyOps Demo Replay Workflow → mock data → n8n.cloud webhook
+Mock data, gerçek Cooja simülasyonundan elde edilen log formatını ve event pattern'lerini birebir yansıtıyor. 5 node'un 18 adımlık dramatik senaryosu var: normal başlangıç → Node#3 kademeli bozulma → cross-node etki → network recovery → stabil son.
+Bu karar neden doğru:
+
+Sistem bilgisayar kapalıyken bile çalışır
+Demo tamamen kontrollü ve tekrarlanabilir
+Anomalilerin tam nerede çıkacağı önceden bilinir
+Jüri linke istediği zaman girebilir, canlı execution görür
+
+
+Localden Cloud'a Taşıma Stratejisi
+Şu anki durum: Her şey local Docker'da çalışıyor (localhost:5678). Bu sadece geliştirme aşaması için.
+Hedef: n8n.cloud'un 14 günlük free trial hesabına taşımak. Mülakat süreci zaten birkaç haftada biteceği için 14 gün fazlasıyla yeterli.
+Taşıma adımları (henüz yapılmadı):
+
+app.n8n.cloud'da free trial hesabı aç
+Ana workflow'u (skyops-main.json) export et → cloud'a import et
+Demo Replay workflow'unu (skyops-replay.json) export et → cloud'a import et
+Demo Replay'deki HTTP Request URL'ini localhost:5678 yerine cloud webhook URL'iyle güncelle: https://senin-adin.app.n8n.cloud/webhook/cooja-logs
+Her iki workflow'u Publish et
+SKYMOD'a cloud linkini paylaş
+
+Cloud mimarisinde veri akışı:
+[n8n.cloud — 7/24 aktif]
+Schedule Trigger (her 1 dk)
+        ↓
+Mock Data Engine (18 adımlık senaryo, sırayla)
+        ↓
+HTTP POST → aynı cloud'daki ana webhook
+        ↓
+Parser → Memory Manager → Switch
+        ↓                ↓
+   Rule Engine      Groq LLM Agent
+        ↓                ↓
+         Merge (Append)
+              ↓
+           IF Node
+        ↓         ↓
+  Telegram Alert   No Operation
+Bilgisayar tamamen kapalıyken bile bu döngü her dakika çalışır. Jüri linke girdiğinde Executions sekmesinde canlı sonuçları görür.
+
+Log Formatı ve Veri Köprüsü
+Log üretimi (Cooja Script Editor):
+javascriptvar FileWriter = Java.type("java.io.FileWriter");
+var logFile = new FileWriter("/home/omer/contiki-ng/cooja_events.log");
+logFile.write(time + " ID:" + id + " " + msg + "\n");
+logFile.flush();
+Gerçek log formatı örneği:
+526909 ID:2 [INFO: Main] Starting Contiki-NG-release/v5.1-171-g6a35472a3
+1198958059 ID:2 [INFO: App] Not reachable yet
+400187051 ID:5 [INFO: App] Not reachable yet
+log_forwarder.py (local development için):
+pythonimport time
+import requests
+
+N8N_WEBHOOK_URL = "http://localhost:5678/webhook-test/cooja-logs"
+LOG_FILE_PATH = r"\\wsl$\Ubuntu\home\omer\contiki-ng\cooja_events.log"
+
+def watch_log_file():
+    print("🚀 NetOps Log Köprüsü Başlatıldı.")
+    with open(LOG_FILE_PATH, "r", encoding="utf-8", errors="ignore") as f:
+        f.seek(0, 2)
+        while True:
+            line = f.readline()
+            if not line:
+                time.sleep(0.5)
+                continue
+            clean_line = line.strip()
+            if clean_line and ("ID:" in clean_line or "INFO:" in clean_line):
+                print(f"📦 n8n'e gönderiliyor: {clean_line}")
+                payload = {"log_line": clean_line}
+                try:
+                    response = requests.post(N8N_WEBHOOK_URL, json=payload, timeout=2)
+                    print(f"✅ n8n cevabı: {response.status_code}")
+                except requests.exceptions.RequestException as e:
+                    print(f"❌ Bağlantı hatası: {e}")
+
+if __name__ == "__main__":
+    watch_log_file()
+
+n8n Workflow Mimarisi — Ana Pipeline
+Şu an local'de Published durumda. 11 node içeriyor.
+Node 1 — Webhook
+
+Path: cooja-logs, Method: POST
+Local: http://localhost:5678/webhook/cooja-logs
+Cloud (hedef): https://senin-adin.app.n8n.cloud/webhook/cooja-logs
+
+Node 2 — Code in JavaScript (Log Parser)
+javascriptconst line = $json.log_line;
+const timeMatch = line.match(/^(\d+)/);
+const idMatch = line.match(/ID:(\d+)/);
+const msg = line.replace(/^\d+\s+ID:\d+\s*/, '').trim();
+
+let eventType = 'NORMAL';
+if (msg.includes('Not reachable yet')) eventType = 'ROUTING_FAILURE';
+else if (msg.includes('Waiting for prefix')) eventType = 'INITIALIZATION';
+else if (msg.includes('parent switch')) eventType = 'TOPOLOGY_CHANGE';
+else if (msg.includes('failed') || msg.includes('ERROR')) eventType = 'NODE_FAILURE';
+
+return [{
+  json: {
+    timestamp: timeMatch ? timeMatch[1] : '0',
+    node_id: idMatch ? idMatch[1] : 'unknown',
+    message: msg,
+    event_type: eventType,
+    raw_line: line
+  }
+}];
+Node 3 — Memory Manager (Code Node)
+n8n'in $getWorkflowStaticData('global') ile kalıcı state yönetimi. Her node için health score (0-100) ve son 5 event geçmişi tutuluyor. Bu gerçek "agentic memory" — LLM tek logu değil temporal pattern'i görüyor:
+javascriptconst staticData = $getWorkflowStaticData('global');
+
+if (!staticData.nodeHistory) staticData.nodeHistory = {};
+if (!staticData.healthScores) staticData.healthScores = {};
+
+const nodeId = $json.node_id;
+
+if (!staticData.healthScores[nodeId]) staticData.healthScores[nodeId] = 100;
+
+const score = staticData.healthScores[nodeId];
+if ($json.event_type === 'NODE_FAILURE')    staticData.healthScores[nodeId] = Math.max(0, score - 30);
+if ($json.event_type === 'ROUTING_FAILURE') staticData.healthScores[nodeId] = Math.max(0, score - 15);
+if ($json.event_type === 'TOPOLOGY_CHANGE') staticData.healthScores[nodeId] = Math.max(0, score - 5);
+if ($json.event_type === 'NORMAL')          staticData.healthScores[nodeId] = Math.min(100, score + 2);
+
+if (!staticData.nodeHistory[nodeId]) staticData.nodeHistory[nodeId] = [];
+staticData.nodeHistory[nodeId].push({
+  event_type: $json.event_type,
+  message: $json.message,
+  timestamp: $json.timestamp
+});
+if (staticData.nodeHistory[nodeId].length > 5) staticData.nodeHistory[nodeId].shift();
+
+const networkSummary = Object.entries(staticData.healthScores)
+  .map(([id, s]) => `Node#${id}:${s}`)
+  .join(', ');
+
+return [{
+  json: {
+    ...$json,
+    health_score: staticData.healthScores[nodeId],
+    node_history: staticData.nodeHistory[nodeId],
+    network_summary: networkSummary,
+    history_context: staticData.nodeHistory[nodeId]
+      .map(h => `${h.event_type}: ${h.message}`)
+      .join(' | ')
+  }
+}];
+Node 4 — Switch (Router)
+
+Output 0 → NORMAL, INITIALIZATION → Rule Engine
+Output 1 → ROUTING_FAILURE, TOPOLOGY_CHANGE, NODE_FAILURE → LLM
+
+Node 5 — Rule Engine (Code Node)
+javascriptconst { event_type, node_id, message } = $json;
+
+const rules = {
+  ROUTING_FAILURE: { severity: 'HIGH',     action: 'RPL routing tablosunu kontrol et, parent node\'u doğrula' },
+  TOPOLOGY_CHANGE: { severity: 'MEDIUM',   action: 'Ağ kararlılığını izle, parent değişimlerini logla' },
+  NODE_FAILURE:    { severity: 'CRITICAL', action: 'Acil müdahale gerekli, node\'u yeniden başlat' },
+  INITIALIZATION:  { severity: 'LOW',      action: 'Node başlatılıyor, izlemeye devam et' },
+  NORMAL:          { severity: 'LOW',      action: null }
+};
+
+const result = rules[event_type] || rules.NORMAL;
+
+return [{
+  json: {
+    method: 'RULE_BASED',
+    anomaly_detected: event_type !== 'NORMAL' && event_type !== 'INITIALIZATION',
+    anomaly_type: event_type,
+    severity: result.severity,
+    affected_node: `Node #${node_id}`,
+    suggested_action: result.action,
+    explanation: `Kural eşleşmesi: ${event_type}`,
+    original_message: message,
+    health_score: $json.health_score,
+    network_summary: $json.network_summary
+  }
+}];
+Node 6 — HTTP Request (Groq LLM)
+
+URL: https://api.groq.com/openai/v1/chat/completions
+Model: llama-3.1-8b-instant
+Authorization: Bearer token (Groq API key)
+
+json{
+  "model": "llama-3.1-8b-instant",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a NetOps AI Agent monitoring an RPL IoT mesh network. Analyze the input and return ONLY valid JSON: {\"anomaly_detected\": boolean, \"anomaly_type\": string|null, \"severity\": \"LOW\"|\"MEDIUM\"|\"HIGH\"|\"CRITICAL\"|null, \"affected_node\": string|null, \"explanation\": string, \"suggested_action\": string|null}"
+    },
+    {
+      "role": "user",
+      "content": "Node ID: {{ $json.node_id }}\nEvent Type: {{ $json.event_type }}\nLog: {{ $json.message }}\nHealth Score: {{ $json.health_score }}/100\nRecent History: {{ $json.history_context }}\nNetwork Status: {{ $json.network_summary }}"
+    }
+  ],
+  "temperature": 0.1,
+  "max_tokens": 300
+}
+Node 7 — LLM Output Parser (Code Node)
+javascriptconst raw = $json.choices[0].message.content;
+const clean = raw.replace(/```json|```/g, '').trim();
+const parsed = JSON.parse(clean);
+return [{
+  json: {
+    ...parsed,
+    method: 'LLM_GROQ',
+    affected_node: `Node #${$json.node_id || '?'}`
+  }
+}];
+Node 8 — Merge (Append)
+Rule Engine (Input 1) + LLM Output Parser (Input 2) → tek akış
+Node 9 — IF
+{{ $json.anomaly_detected }} is equal to true
+
+True → Telegram
+False → No Operation
+
+Node 10 — Telegram
+Bot token ve Chat ID bağlı. Mesaj formatı:
+🚨 SkyOps Alert — {{ $json.severity }}
+
+📡 Node: {{ $json.affected_node }}
+⚠️ Anomali: {{ $json.anomaly_type }}
+🤖 Tespit: {{ $json.method }}
+📋 Açıklama: {{ $json.explanation }}
+💡 Öneri: {{ $json.suggested_action }}
+
+⏱ Zaman: {{ $now }}
+Node 11 — No Operation
+NORMAL loglar için sessizce bitiyor.
+
+İkinci Workflow — SkyOps Demo Replay
+Amaç: Cooja'nın local olmasından kaynaklanan bağımlılığı ortadan kaldırmak. Bilgisayar kapalıyken de sistem çalışsın, jüri istediği zaman test edebilsin.
+Durum: Local'de kurulu, henüz cloud'a taşınmadı.
+Yapısı:
+Schedule Trigger → Her 1 dakikada bir
+Mock Data Engine (Code Node):
+javascriptconst SCENARIO = [
+  { time: "00:00", node_id: "1", event_type: "NORMAL",          message: "[INFO: BR] IPv6 addresses: fe80::201:1:1:1" },
+  { time: "00:10", node_id: "2", event_type: "NORMAL",          message: "[INFO: App] UDP packet sent to server" },
+  { time: "00:20", node_id: "3", event_type: "NORMAL",          message: "[INFO: App] UDP packet sent to server" },
+  { time: "00:30", node_id: "4", event_type: "NORMAL",          message: "[INFO: App] UDP packet sent to server" },
+  { time: "00:40", node_id: "5", event_type: "NORMAL",          message: "[INFO: App] UDP packet sent to server" },
+  { time: "00:50", node_id: "3", event_type: "ROUTING_FAILURE", message: "[INFO: App] Not reachable yet" },
+  { time: "01:10", node_id: "3", event_type: "TOPOLOGY_CHANGE", message: "[INFO: RPL] parent switch from node2 to node1" },
+  { time: "01:30", node_id: "4", event_type: "TOPOLOGY_CHANGE", message: "[INFO: RPL] parent switch from node3 to node2" },
+  { time: "01:50", node_id: "3", event_type: "ROUTING_FAILURE", message: "[INFO: App] Not reachable yet" },
+  { time: "02:10", node_id: "3", event_type: "NODE_FAILURE",    message: "[ERROR] Node heartbeat timeout after 3 retries" },
+  { time: "02:30", node_id: "5", event_type: "ROUTING_FAILURE", message: "[INFO: App] Not reachable yet" },
+  { time: "02:50", node_id: "2", event_type: "TOPOLOGY_CHANGE", message: "[INFO: RPL] parent switch from node3 to node1" },
+  { time: "03:10", node_id: "3", event_type: "ROUTING_FAILURE", message: "[INFO: App] Attempting reconnection..." },
+  { time: "03:30", node_id: "3", event_type: "NORMAL",          message: "[INFO: App] Reconnected. UDP packet sent" },
+  { time: "03:50", node_id: "5", event_type: "NORMAL",          message: "[INFO: App] UDP packet sent to server" },
+  { time: "04:10", node_id: "4", event_type: "NORMAL",          message: "[INFO: App] UDP packet sent to server" },
+  { time: "04:30", node_id: "2", event_type: "NORMAL",          message: "[INFO: App] Network stable, UDP sent" },
+  { time: "04:50", node_id: "1", event_type: "NORMAL",          message: "[INFO: BR] All nodes reachable" },
+];
+
+const staticData = $getWorkflowStaticData('global');
+if (staticData.index === undefined) staticData.index = 0;
+
+const log = SCENARIO[staticData.index % SCENARIO.length];
+staticData.index++;
+
+const timestamp = Date.now();
+
+return [{
+  json: {
+    timestamp: String(timestamp),
+    node_id: log.node_id,
+    event_type: log.event_type,
+    message: log.message,
+    raw_line: `${timestamp} ID:${log.node_id} ${log.message}`,
+    scenario_time: log.time,
+    replay_mode: true
+  }
+}];
+HTTP Request → Şu an http://localhost:5678/webhook/cooja-logs (cloud'a taşınınca güncellenecek)
+
+Yapılmış Olanlar ✅
+
+Cooja simülasyonu kurulumu ve gerçek log üretimi
+log_forwarder.py (canlı log köprüsü, local development)
+Ana n8n workflow (11 node, local'de Published)
+Memory Manager (temporal context, health score sistemi)
+Hybrid detection: Rule-based + LLM (Groq llama-3.1-8b)
+Telegram alert entegrasyonu
+Demo Replay workflow (mock data, local kurulu)
+Mock data senaryosu (18 adım, dramatik failure → recovery hikayesi)
+
+Yapılacaklar ⬜
+Cloud taşıma (en kritik):
+
+n8n.cloud free trial hesabı açmak
+Her iki workflow'u export → import etmek
+Demo Replay URL'ini cloud webhook'la güncellemek
+Her ikisini Publish etmek
+SKYMOD'a cloud linkini paylaşmak
+
+Özellik geliştirme:
+
+Real-time dashboard (HTML/React, n8n webhook'tan GET ile veri çeken, SKYMOD renk şemasında)
+Synthetic log generator (demo sırasında kontrollü anomali üretimi)
+LLM vs Rule-based benchmark tablosu (sayısal karşılaştırma)
+GitHub repository + professional README (SKYMOD vizyonuna atıf, demo GIF, mimari diyagram)
+
+

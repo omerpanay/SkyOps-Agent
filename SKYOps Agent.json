@@ -1,0 +1,328 @@
+{
+  "name": "SkyOps Agent — Multi-Agent Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cooja-logs",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-608, -144],
+      "id": "fb1ed070-e04c-4ff6-b0c7-fb5002844e66",
+      "name": "Webhook",
+      "webhookId": "04d76fc4-d3bb-4632-a896-030b0b6ac56e"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputJson = $input.first().json;\nconst line = inputJson.body ? inputJson.body.log_line : inputJson.log_line;\n\nif (!line) {\n    return [{ json: { error: \"Log line bulunamadı\" } }];\n}\n\nconst timeMatch = line.match(/^(\\d+)/);\nconst idMatch = line.match(/ID:(\\d+)/);\nconst msg = line.replace(/^\\d+\\s+ID:\\d+\\s*/, '').trim();\n\nlet eventType = 'NORMAL';\nif (msg.includes('Not reachable yet')) eventType = 'ROUTING_FAILURE';\nelse if (msg.includes('Waiting for prefix')) eventType = 'INITIALIZATION';\nelse if (msg.includes('parent switch')) eventType = 'TOPOLOGY_CHANGE';\nelse if (msg.includes('failed') || msg.includes('ERROR')) eventType = 'NODE_FAILURE';\n\nreturn [{\n  json: {\n    timestamp: timeMatch ? timeMatch[1] : '0',\n    node_id: idMatch ? idMatch[1] : 'unknown',\n    message: msg,\n    event_type: eventType,\n    raw_line: line\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-208, -128],
+      "id": "5587e13d-5d76-43b9-ae9b-865a0ee1884e",
+      "name": "Log Parser"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\n\nif (!staticData.nodeHistory) staticData.nodeHistory = {};\nif (!staticData.healthScores) staticData.healthScores = {};\n\nconst nodeId = $json.node_id;\n\nif (!staticData.healthScores[nodeId]) staticData.healthScores[nodeId] = 100;\n\nconst score = staticData.healthScores[nodeId];\nif ($json.event_type === 'NODE_FAILURE')    staticData.healthScores[nodeId] = Math.max(0, score - 30);\nif ($json.event_type === 'ROUTING_FAILURE') staticData.healthScores[nodeId] = Math.max(0, score - 15);\nif ($json.event_type === 'TOPOLOGY_CHANGE') staticData.healthScores[nodeId] = Math.max(0, score - 5);\nif ($json.event_type === 'NORMAL')          staticData.healthScores[nodeId] = Math.min(100, score + 2);\n\nif (!staticData.nodeHistory[nodeId]) staticData.nodeHistory[nodeId] = [];\nstaticData.nodeHistory[nodeId].push({\n  event_type: $json.event_type,\n  message: $json.message,\n  timestamp: $json.timestamp\n});\nif (staticData.nodeHistory[nodeId].length > 5) {\n  staticData.nodeHistory[nodeId].shift();\n}\n\nconst networkSummary = Object.entries(staticData.healthScores)\n  .map(([id, s]) => `Node#${id}:${s}`)\n  .join(', ');\n\nreturn [{\n  json: {\n    ...$json,\n    health_score: staticData.healthScores[nodeId],\n    node_history: staticData.nodeHistory[nodeId],\n    network_summary: networkSummary,\n    history_context: staticData.nodeHistory[nodeId]\n      .map(h => `${h.event_type}: ${h.message}`)\n      .join(' | ')\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, -128],
+      "id": "a6428544-58a7-4f8f-ae9b-ed8d82802fee",
+      "name": "Memory Manager"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "NORMAL",
+                    "operator": { "type": "string", "operation": "equals" },
+                    "id": "82a90f20-8214-410c-b0ea-199fea535540"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 },
+                "conditions": [
+                  {
+                    "id": "3fc39464-9ddf-4323-9b94-642b84b05bee",
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "NORMAL",
+                    "operator": { "type": "string", "operation": "notEquals" }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [224, -80],
+      "id": "55012b88-5753-4a1d-a499-07f8acb5fcdf",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputData = $input.first().json;\n\nconst rules = {\n  ROUTING_FAILURE: { severity: 'HIGH', action: 'Check RPL routing table, verify parent node' },\n  INITIALIZATION: { severity: 'LOW', action: 'System starting up, waiting for configuration' },\n  TOPOLOGY_CHANGE: { severity: 'MEDIUM', action: 'Monitor for instability, log parent changes' },\n  NODE_FAILURE: { severity: 'CRITICAL', action: 'Immediate inspection required' },\n  NORMAL: { severity: 'LOW', action: null }\n};\n\nconst result = rules[inputData.event_type] || rules.NORMAL;\n\nreturn [{\n  json: {\n    method: 'RULE_BASED',\n    anomaly_detected: inputData.event_type !== 'NORMAL' && inputData.event_type !== 'INITIALIZATION',\n    anomaly_type: inputData.event_type,\n    severity: result.severity,\n    affected_node: inputData.node_id,\n    suggested_action: result.action,\n    explanation: `Rule-based match triggered for event: ${inputData.event_type}`,\n    message: inputData.message\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [496, -300],
+      "id": "61109fc7-fbc7-4cac-b199-299315cc6f3e",
+      "name": "Rule Engine"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "groqApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are Agent-1: ANOMALY DETECTOR in a multi-agent NetOps AI system monitoring an RPL IoT mesh network.\\n\\nYour ONLY job is to detect and classify the anomaly. Return ONLY valid JSON, no markdown:\\n{\\\"anomaly_detected\\\": boolean, \\\"anomaly_type\\\": string|null, \\\"severity\\\": \\\"LOW\\\"|\\\"MEDIUM\\\"|\\\"HIGH\\\"|\\\"CRITICAL\\\"|null, \\\"confidence_score\\\": number (0.0-1.0), \\\"preliminary_diagnosis\\\": string}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Node ID: {{ $json.node_id }}\\nEvent Type: {{ $json.event_type }}\\nLog: {{ $json.message }}\\nHealth Score: {{ $json.health_score }}/100\\nRecent History: {{ $json.history_context }}\\nNetwork Status: {{ $json.network_summary }}\"\n    }\n  ],\n  \"temperature\": 0.1,\n  \"max_tokens\": 250\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [496, 48],
+      "id": "cee48ad1-934b-489f-9d07-314f2902dae9",
+      "name": "Agent 1 — Detector",
+      "credentials": {
+        "groqApi": {
+          "id": "drcj6VmOscYi5SPr",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.choices[0].message.content;\nconst clean = raw.replace(/```json|```/g, '').trim();\nlet parsed;\ntry {\n  parsed = JSON.parse(clean);\n} catch(e) {\n  parsed = { anomaly_detected: true, anomaly_type: 'PARSE_ERROR', severity: 'MEDIUM', confidence_score: 0.5, preliminary_diagnosis: raw };\n}\n\n// Pass through original data + Agent 1 results\nreturn [{\n  json: {\n    // Original event data\n    node_id: $('Memory Manager').first().json.node_id,\n    event_type: $('Memory Manager').first().json.event_type,\n    message: $('Memory Manager').first().json.message,\n    health_score: $('Memory Manager').first().json.health_score,\n    history_context: $('Memory Manager').first().json.history_context,\n    network_summary: $('Memory Manager').first().json.network_summary,\n    // Agent 1 output\n    agent1_anomaly_detected: parsed.anomaly_detected,\n    agent1_anomaly_type: parsed.anomaly_type,\n    agent1_severity: parsed.severity,\n    agent1_confidence: parsed.confidence_score || 0.8,\n    agent1_diagnosis: parsed.preliminary_diagnosis\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 48],
+      "id": "a1-parser-001",
+      "name": "Agent 1 Parser"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "groqApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are Agent-2: ROOT CAUSE ANALYZER in a multi-agent NetOps AI system.\\n\\nAgent-1 (Detector) has already identified an anomaly. Your job is to analyze the temporal history and network context to determine the ROOT CAUSE.\\n\\nReturn ONLY valid JSON:\\n{\\\"root_cause\\\": string, \\\"contributing_factors\\\": [string], \\\"impact_scope\\\": \\\"SINGLE_NODE\\\"|\\\"MULTI_NODE\\\"|\\\"NETWORK_WIDE\\\", \\\"temporal_pattern\\\": string, \\\"confidence_score\\\": number (0.0-1.0)}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"=== AGENT-1 DETECTOR REPORT ===\\nAnomaly: {{ $json.agent1_anomaly_type }}\\nSeverity: {{ $json.agent1_severity }}\\nDiagnosis: {{ $json.agent1_diagnosis }}\\n\\n=== RAW EVENT ===\\nNode ID: {{ $json.node_id }}\\nLog: {{ $json.message }}\\nHealth Score: {{ $json.health_score }}/100\\nRecent History: {{ $json.history_context }}\\nNetwork: {{ $json.network_summary }}\"\n    }\n  ],\n  \"temperature\": 0.1,\n  \"max_tokens\": 300\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [944, 48],
+      "id": "a2-rootcause-001",
+      "name": "Agent 2 — Root Cause",
+      "credentials": {
+        "groqApi": {
+          "id": "drcj6VmOscYi5SPr",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.choices[0].message.content;\nconst clean = raw.replace(/```json|```/g, '').trim();\nlet parsed;\ntry {\n  parsed = JSON.parse(clean);\n} catch(e) {\n  parsed = { root_cause: 'Analysis unavailable', contributing_factors: [], impact_scope: 'SINGLE_NODE', temporal_pattern: 'Unknown', confidence_score: 0.5 };\n}\n\n// Carry forward all previous data + Agent 2 results\nconst prev = $('Agent 1 Parser').first().json;\nreturn [{\n  json: {\n    ...prev,\n    agent2_root_cause: parsed.root_cause,\n    agent2_contributing_factors: parsed.contributing_factors || [],\n    agent2_impact_scope: parsed.impact_scope,\n    agent2_temporal_pattern: parsed.temporal_pattern,\n    agent2_confidence: parsed.confidence_score || 0.7\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1168, 48],
+      "id": "a2-parser-001",
+      "name": "Agent 2 Parser"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "groqApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are Agent-3: ACTION ADVISOR in a multi-agent NetOps AI system.\\n\\nAgent-1 detected the anomaly. Agent-2 analyzed the root cause. Your job is to recommend the BEST course of action.\\n\\nReturn ONLY valid JSON:\\n{\\\"immediate_action\\\": string, \\\"preventive_measures\\\": [string], \\\"estimated_recovery\\\": string, \\\"escalation_needed\\\": boolean, \\\"confidence_score\\\": number (0.0-1.0)}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"=== AGENT-1 DETECTOR ===\\nAnomaly: {{ $json.agent1_anomaly_type }} ({{ $json.agent1_severity }})\\nDiagnosis: {{ $json.agent1_diagnosis }}\\n\\n=== AGENT-2 ROOT CAUSE ===\\nCause: {{ $json.agent2_root_cause }}\\nImpact: {{ $json.agent2_impact_scope }}\\nPattern: {{ $json.agent2_temporal_pattern }}\\n\\n=== CONTEXT ===\\nNode: {{ $json.node_id }} | Health: {{ $json.health_score }}/100\\nNetwork: {{ $json.network_summary }}\"\n    }\n  ],\n  \"temperature\": 0.15,\n  \"max_tokens\": 300\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1392, 48],
+      "id": "a3-action-001",
+      "name": "Agent 3 — Action Advisor",
+      "credentials": {
+        "groqApi": {
+          "id": "drcj6VmOscYi5SPr",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Agent 3 output\nconst raw = $input.first().json.choices[0].message.content;\nconst clean = raw.replace(/```json|```/g, '').trim();\nlet agent3;\ntry {\n  agent3 = JSON.parse(clean);\n} catch(e) {\n  agent3 = { immediate_action: 'Manual review required', preventive_measures: [], estimated_recovery: 'Unknown', escalation_needed: true, confidence_score: 0.5 };\n}\n\n// Get all previous agent data\nconst prev = $('Agent 2 Parser').first().json;\n\n// Calculate consensus confidence (average of 3 agents)\nconst avgConfidence = (\n  (prev.agent1_confidence || 0.8) + \n  (prev.agent2_confidence || 0.7) + \n  (agent3.confidence_score || 0.7)\n) / 3;\n\n// Take the highest severity (conservative approach)\nconst severityOrder = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];\nconst maxSeverity = prev.agent1_severity || 'MEDIUM';\n\nreturn [{\n  json: {\n    method: 'MULTI_AGENT_LLM',\n    anomaly_detected: prev.agent1_anomaly_detected,\n    anomaly_type: prev.agent1_anomaly_type,\n    severity: maxSeverity,\n    affected_node: prev.node_id,\n    \n    // Agent 1 — Detector\n    explanation: prev.agent1_diagnosis,\n    \n    // Agent 2 — Root Cause\n    root_cause: prev.agent2_root_cause,\n    impact_scope: prev.agent2_impact_scope,\n    \n    // Agent 3 — Action\n    suggested_action: agent3.immediate_action,\n    preventive_measures: (agent3.preventive_measures || []).join('; '),\n    estimated_recovery: agent3.estimated_recovery,\n    escalation_needed: agent3.escalation_needed,\n    \n    // Consensus\n    consensus_confidence: Math.round(avgConfidence * 100) / 100,\n    agents_completed: '3/3',\n    \n    // Original data\n    message: prev.message,\n    health_score: prev.health_score,\n    network_summary: prev.network_summary\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1616, 48],
+      "id": "consensus-001",
+      "name": "Consensus Builder"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [1840, -224],
+      "id": "2b3d3324-8434-4aa1-97a8-b98dcefd92d0",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 },
+          "conditions": [
+            {
+              "id": "c6837ba6-e172-485e-a07d-b4914d3e2c88",
+              "leftValue": "={{ $json.anomaly_detected }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [2048, -224],
+      "id": "55c273bf-45d6-457a-b7fb-3ad953a92d07",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "chatId": "7771806225",
+        "text": "=🚨 SkyOps Multi-Agent Alert — {{ $json.severity }}\n\n📡 Node: Node #{{ $json.affected_node }}\n⚠️ Anomaly: {{ $json.anomaly_type }}\n🎯 Confidence: {{ $json.consensus_confidence }}\n\n🔍 DETECTOR: {{ $json.explanation }}\n🧬 ROOT CAUSE: {{ $json.root_cause }}\n💡 ACTION: {{ $json.suggested_action }}\n\n🛡️ Impact: {{ $json.impact_scope }}\n⏱️ Recovery: {{ $json.estimated_recovery }}\n🤖 Agents: {{ $json.agents_completed }} ✅\n\n🕐 Zaman: {{ $now }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2256, -320],
+      "id": "d59131f3-906f-41ce-93e0-baef8271c547",
+      "name": "Telegram Alert",
+      "webhookId": "daeb3bfa-2c0b-434e-908d-3e88bcf0efd6",
+      "credentials": {
+        "telegramApi": {
+          "id": "gfBdkQVrxj9mHSSV",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2256, -128],
+      "id": "8ce0109d-ad89-4896-b4d9-9e5153031ac1",
+      "name": "No Operation, do nothing"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [{ "node": "Log Parser", "type": "main", "index": 0 }]
+      ]
+    },
+    "Log Parser": {
+      "main": [
+        [{ "node": "Memory Manager", "type": "main", "index": 0 }]
+      ]
+    },
+    "Memory Manager": {
+      "main": [
+        [{ "node": "Switch", "type": "main", "index": 0 }]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [{ "node": "Rule Engine", "type": "main", "index": 0 }],
+        [{ "node": "Agent 1 — Detector", "type": "main", "index": 0 }]
+      ]
+    },
+    "Rule Engine": {
+      "main": [
+        [{ "node": "Merge", "type": "main", "index": 0 }]
+      ]
+    },
+    "Agent 1 — Detector": {
+      "main": [
+        [{ "node": "Agent 1 Parser", "type": "main", "index": 0 }]
+      ]
+    },
+    "Agent 1 Parser": {
+      "main": [
+        [{ "node": "Agent 2 — Root Cause", "type": "main", "index": 0 }]
+      ]
+    },
+    "Agent 2 — Root Cause": {
+      "main": [
+        [{ "node": "Agent 2 Parser", "type": "main", "index": 0 }]
+      ]
+    },
+    "Agent 2 Parser": {
+      "main": [
+        [{ "node": "Agent 3 — Action Advisor", "type": "main", "index": 0 }]
+      ]
+    },
+    "Agent 3 — Action Advisor": {
+      "main": [
+        [{ "node": "Consensus Builder", "type": "main", "index": 0 }]
+      ]
+    },
+    "Consensus Builder": {
+      "main": [
+        [{ "node": "Merge", "type": "main", "index": 1 }]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [{ "node": "If", "type": "main", "index": 0 }]
+      ]
+    },
+    "If": {
+      "main": [
+        [{ "node": "Telegram Alert", "type": "main", "index": 0 }],
+        [{ "node": "No Operation, do nothing", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "2a0b1c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "853bcebacb025c2f4ba85369796638b90cf63f57b3fcb1ffd2d438af059ce531"
+  },
+  "id": "JnSDeSAu6SBpbMsQ",
+  "tags": []
+}
