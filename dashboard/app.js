@@ -520,6 +520,192 @@ function init() {
   console.log('🚀 SkyOps Agent Dashboard initialized');
   console.log('📊 18-step scenario will play automatically');
   console.log('🔄 Scenario repeats after completion');
+
+  // Initialize chat widget
+  initChat();
+  console.log('💬 Chat widget ready');
+}
+
+// ============================================================
+// 16. CHAT ENGINE — Smart AI Assistant
+// ============================================================
+function initChat() {
+  const fab = document.getElementById('chatFab');
+  const panel = document.getElementById('chatPanel');
+  const closeBtn = document.getElementById('chatClose');
+  const input = document.getElementById('chatInput');
+  const sendBtn = document.getElementById('chatSend');
+  const messages = document.getElementById('chatMessages');
+  const suggestions = document.querySelectorAll('.chat-suggestion');
+
+  // Toggle chat panel
+  fab.addEventListener('click', () => {
+    panel.classList.add('open');
+    fab.classList.add('hidden');
+    input.focus();
+  });
+
+  closeBtn.addEventListener('click', () => {
+    panel.classList.remove('open');
+    fab.classList.remove('hidden');
+  });
+
+  // Send message
+  function sendMessage(text) {
+    if (!text.trim()) return;
+    addUserMessage(text);
+    input.value = '';
+    showTyping();
+    setTimeout(() => {
+      removeTyping();
+      const response = generateResponse(text);
+      addAIMessage(response);
+    }, 800 + Math.random() * 700);
+  }
+
+  sendBtn.addEventListener('click', () => sendMessage(input.value));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendMessage(input.value);
+  });
+
+  suggestions.forEach(btn => {
+    btn.addEventListener('click', () => sendMessage(btn.dataset.msg));
+  });
+}
+
+function addUserMessage(text) {
+  const messages = document.getElementById('chatMessages');
+  const msg = document.createElement('div');
+  msg.className = 'chat-msg chat-msg--user';
+  msg.innerHTML = `<span class="chat-msg-avatar">👤</span><div class="chat-msg-bubble"><p>${text}</p></div>`;
+  messages.appendChild(msg);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function addAIMessage(html) {
+  const messages = document.getElementById('chatMessages');
+  const msg = document.createElement('div');
+  msg.className = 'chat-msg chat-msg--ai';
+  msg.innerHTML = `<span class="chat-msg-avatar">🤖</span><div class="chat-msg-bubble">${html}</div>`;
+  messages.appendChild(msg);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function showTyping() {
+  const messages = document.getElementById('chatMessages');
+  const typing = document.createElement('div');
+  typing.className = 'chat-msg chat-msg--ai';
+  typing.id = 'typingIndicator';
+  typing.innerHTML = `<span class="chat-msg-avatar">🤖</span><div class="chat-typing"><span class="chat-typing-dot"></span><span class="chat-typing-dot"></span><span class="chat-typing-dot"></span></div>`;
+  messages.appendChild(typing);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function removeTyping() {
+  const el = document.getElementById('typingIndicator');
+  if (el) el.remove();
+}
+
+// ============================================================
+// 17. SMART RESPONSE GENERATOR — Uses live dashboard state
+// ============================================================
+function generateResponse(userMsg) {
+  const msg = userMsg.toLowerCase();
+  const scores = state.healthScores;
+  const avg = Math.round(Object.values(scores).reduce((a, b) => a + b, 0) / 5);
+  const problematic = Object.entries(scores).filter(([, s]) => s < 70);
+  const critical = Object.entries(scores).filter(([, s]) => s < 30);
+  const anomalyPct = state.totalEvents > 0 ? Math.round((state.anomalyCount / state.totalEvents) * 100) : 0;
+  const lastEvents = state.events.slice(-5);
+
+  // Intent: Network status overview
+  if (msg.match(/durum|status|genel|overview|nasıl|özet|network/i)) {
+    let status = avg >= 80 ? '🟢 <strong>Stabil</strong>' : avg >= 50 ? '🟡 <strong>Dikkat Gerektiriyor</strong>' : '🔴 <strong>Kritik</strong>';
+    let html = `<p>📊 <strong>Ağ Durumu:</strong> ${status}</p>`;
+    html += `<p>Ortalama sağlık skoru: <code>${avg}/100</code></p>`;
+    html += `<p>Toplam event: <code>${state.totalEvents}</code> | Anomali: <code>${state.anomalyCount}</code> (${anomalyPct}%)</p>`;
+    html += `<p>Node skorları: ${Object.entries(scores).map(([id, s]) => `Node#${id}: <code>${s}</code>`).join(', ')}</p>`;
+    if (problematic.length > 0) {
+      html += `<p>⚠️ Sorunlu node'lar: ${problematic.map(([id, s]) => `<strong>Node#${id}</strong> (${s}/100)`).join(', ')}</p>`;
+    }
+    return html;
+  }
+
+  // Intent: Specific node query
+  const nodeMatch = msg.match(/node\s*#?(\d)/i);
+  if (nodeMatch) {
+    const nodeId = nodeMatch[1];
+    const score = scores[nodeId];
+    if (score === undefined) return `<p>Node#${nodeId} bu ağda bulunmuyor. Mevcut node'lar: 1-5.</p>`;
+    const status = score >= 80 ? '🟢 Sağlıklı' : score >= 50 ? '🟡 Dikkat' : score < 30 ? '🔴 Kritik' : '🟠 Tehlikede';
+    let html = `<p>📡 <strong>Node #${nodeId}</strong> — ${status}</p>`;
+    html += `<p>Sağlık Skoru: <code>${score}/100</code></p>`;
+    if (score < 50) {
+      html += `<p>🔍 <strong>Analiz:</strong> Bu node'da sağlık skoru düşük. Olası nedenler: routing failure, heartbeat timeout, veya parent switch instabilitesi.</p>`;
+      html += `<p>💡 <strong>Öneri:</strong> Node'u soft restart yapın ve RPL routing tablosunu kontrol edin.</p>`;
+    } else if (score < 80) {
+      html += `<p>⚠️ Hafif performans düşüşü var. Topology değişiklikleri izleniyor.</p>`;
+    } else {
+      html += `<p>✅ Node stabil çalışıyor, herhangi bir sorun tespit edilmedi.</p>`;
+    }
+    return html;
+  }
+
+  // Intent: Problem / anomaly query
+  if (msg.match(/sorun|problem|anomali|hata|error|arıza|fail|neden|why/i)) {
+    if (problematic.length === 0) {
+      return `<p>✅ Şu an ağda aktif bir sorun tespit edilmiyor. Tüm node'lar sağlıklı çalışıyor.</p><p>Anomali oranı: <code>${anomalyPct}%</code></p>`;
+    }
+    let html = `<p>⚠️ <strong>${problematic.length} node'da sorun tespit edildi:</strong></p>`;
+    problematic.forEach(([id, s]) => {
+      html += `<p>• <strong>Node#${id}</strong>: Skor <code>${s}/100</code> — `;
+      if (s < 30) html += `🔴 Kritik seviye, acil müdahale gerekli</p>`;
+      else if (s < 50) html += `🟠 Tehlikede, yakın izleme gerekli</p>`;
+      else html += `🟡 Hafif düşüş, izleniyor</p>`;
+    });
+    html += `<p>🧬 <strong>Kök Neden:</strong> RPL mesh ağında kademeli routing bozulması. Parent switch olayları cascading etkiye yol açıyor.</p>`;
+    return html;
+  }
+
+  // Intent: Action recommendation
+  if (msg.match(/aksiyon|action|öneri|recommend|ne yap|çözüm|solution|tavsiye/i)) {
+    if (critical.length > 0) {
+      let html = `<p>🚨 <strong>Acil Aksiyon Gerekiyor:</strong></p>`;
+      critical.forEach(([id]) => {
+        html += `<p>1️⃣ Node#${id} için <strong>soft restart</strong> başlatın</p>`;
+      });
+      html += `<p>2️⃣ RPL routing tablosunu doğrulayın</p>`;
+      html += `<p>3️⃣ Komşu node'ların parent bağlantılarını kontrol edin</p>`;
+      html += `<p>4️⃣ Network stabilize olduktan sonra 5 dakika izleyin</p>`;
+      html += `<p>⏱️ Tahmini recovery: <code>~2-3 dakika</code></p>`;
+      return html;
+    } else if (problematic.length > 0) {
+      return `<p>💡 <strong>Öneriler:</strong></p><p>1️⃣ Sorunlu node'ları izlemeye devam edin</p><p>2️⃣ Health score 50'nin altına düşerse soft restart planlayın</p><p>3️⃣ Topology değişimlerini loglamaya devam edin</p><p>✅ Acil müdahale gerekmiyor, durum kontrol altında.</p>`;
+    }
+    return `<p>✅ Ağ stabil durumda. Aktif bir aksiyon gerekmiyor.</p><p>💡 Rutin izlemeye devam edin. SkyOps Agent anomalileri otomatik tespit edecek.</p>`;
+  }
+
+  // Intent: Architecture / how it works
+  if (msg.match(/nasıl çalış|mimari|architecture|agent|multi.*agent|how|sistem/i)) {
+    return `<p>🏗️ <strong>SkyOps Agent Mimarisi:</strong></p>
+    <p>Bu sistem <strong>3 uzman AI agent</strong> ile çalışır:</p>
+    <p>🔍 <strong>Agent 1 — Detector:</strong> Anomali tespiti ve sınıflandırma</p>
+    <p>🧬 <strong>Agent 2 — Root Cause:</strong> Kök neden analizi ve temporal pattern tespiti</p>
+    <p>💡 <strong>Agent 3 — Action Advisor:</strong> Aksiyon önerisi ve recovery tahmini</p>
+    <p>Her agent bir öncekinin analizini alır ve derinleştirir. Sonuçlar <strong>Consensus Builder</strong>'da birleştirilir.</p>
+    <p>📡 Basit event'ler <strong>Rule Engine</strong> ile (0ms), kompleks anomaliler <strong>Multi-Agent LLM</strong> ile analiz edilir (Hybrid Detection).</p>`;
+  }
+
+  // Intent: Greeting
+  if (msg.match(/merhaba|selam|hey|hello|hi/i)) {
+    return `<p>Merhaba! 👋 Ben SkyOps AI Assistant.</p><p>IoT mesh ağınız hakkında sorular sorun — node durumları, anomaliler, aksiyon önerileri konusunda yardımcı olabilirim.</p>`;
+  }
+
+  // Default: general response with current state
+  return `<p>📊 Sorunuzu analiz ediyorum...</p>
+  <p>Şu anki ağ durumu: Ortalama sağlık <code>${avg}/100</code>, ${state.anomalyCount} anomali tespit edildi.</p>
+  <p>${problematic.length > 0 ? `⚠️ Sorunlu node'lar: ${problematic.map(([id, s]) => `Node#${id}(${s})`).join(', ')}` : '✅ Tüm node\'lar stabil.'}</p>
+  <p>Daha spesifik sorular için şunları deneyin: <em>"Node 3 durumu"</em>, <em>"Anomali özeti"</em>, <em>"Ne yapmalıyım?"</em></p>`;
 }
 
 // Start when DOM is ready

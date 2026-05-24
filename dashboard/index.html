@@ -181,6 +181,47 @@
     </section>
   </main>
 
+  <!-- Chat Widget -->
+  <div class="chat-fab" id="chatFab" title="Ask SkyOps AI">
+    <span class="chat-fab-icon">💬</span>
+    <span class="chat-fab-pulse"></span>
+  </div>
+
+  <div class="chat-panel" id="chatPanel">
+    <div class="chat-header">
+      <div class="chat-header-left">
+        <span class="chat-avatar">🤖</span>
+        <div>
+          <div class="chat-title">SkyOps AI Assistant</div>
+          <div class="chat-subtitle">Multi-Agent • Powered by Groq</div>
+        </div>
+      </div>
+      <button class="chat-close" id="chatClose">✕</button>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+      <div class="chat-msg chat-msg--ai">
+        <span class="chat-msg-avatar">🤖</span>
+        <div class="chat-msg-bubble">
+          <p>Merhaba! Ben <strong>SkyOps AI Assistant</strong> — IoT mesh ağınız hakkında her şeyi sorun.</p>
+          <p class="chat-msg-hint">Örneğin: "Node 3'ün durumu nedir?", "Ağda anomali var mı?", "Ne yapmalıyım?"</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-suggestions" id="chatSuggestions">
+      <button class="chat-suggestion" data-msg="Ağın genel durumu nedir?">📊 Ağ Durumu</button>
+      <button class="chat-suggestion" data-msg="Hangi node'larda sorun var?">⚠️ Sorunlu Node'lar</button>
+      <button class="chat-suggestion" data-msg="Son anomalileri özetle">🔍 Anomali Özeti</button>
+      <button class="chat-suggestion" data-msg="Ne aksiyon almalıyım?">💡 Aksiyon Önerisi</button>
+    </div>
+
+    <div class="chat-input-area">
+      <input type="text" class="chat-input" id="chatInput" placeholder="Ağ hakkında bir şey sorun..." autocomplete="off">
+      <button class="chat-send" id="chatSend">➤</button>
+    </div>
+  </div>
+
   <!-- Footer -->
   <footer class="footer">
     <div class="footer-left">
