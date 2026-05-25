@@ -436,7 +436,88 @@ function updateClock() {
 }
 
 // ============================================================
-// 14. SIMULATION ENGINE
+// 14. SELF-HEALING ENGINE — Autonomous action simulation
+// ============================================================
+const HEALING_ACTIONS = {
+  NODE_FAILURE: [
+    { action: '🔄 Initiating soft restart for Node #{node}', detail: 'Sending RST signal via RPL control plane', recovery: '~2 min' },
+    { action: '🔀 Rerouting traffic away from Node #{node}', detail: 'Updating RPL DODAG, redirecting via backup parent', recovery: '~30 sec' },
+  ],
+  ROUTING_FAILURE: [
+    { action: '📡 Re-probing route to Node #{node}', detail: 'Sending DIO/DIS messages to verify reachability', recovery: '~45 sec' },
+    { action: '🗺️ Requesting parent re-evaluation for Node #{node}', detail: 'Triggering RPL local repair procedure', recovery: '~1 min' },
+  ],
+  TOPOLOGY_CHANGE: [
+    { action: '📋 Logging topology change for Node #{node}', detail: 'Recording parent switch event for trend analysis', recovery: 'Monitoring' },
+  ],
+};
+
+function triggerSelfHealing(event, method) {
+  const actions = HEALING_ACTIONS[event.event_type];
+  if (!actions) return;
+
+  const container = document.getElementById('healingContainer');
+  const empty = container.querySelector('.healing-empty');
+  if (empty) empty.remove();
+
+  // Generate confidence score
+  const confidence = event.event_type === 'NODE_FAILURE' ? (0.88 + Math.random() * 0.1) :
+                     event.event_type === 'ROUTING_FAILURE' ? (0.70 + Math.random() * 0.2) :
+                     (0.55 + Math.random() * 0.3);
+  const confRounded = Math.round(confidence * 100) / 100;
+
+  // Escalation logic based on confidence
+  let escalation, escClass;
+  if (confidence >= 0.85) {
+    escalation = '🤖 AUTONOMOUS';
+    escClass = 'action-autonomous';
+  } else if (confidence >= 0.5) {
+    escalation = '👤 HUMAN REVIEW';
+    escClass = 'action-review';
+  } else {
+    escalation = '🚨 ESCALATED';
+    escClass = 'action-escalated';
+  }
+
+  const selectedAction = actions[Math.floor(Math.random() * actions.length)];
+  const actionText = selectedAction.action.replace('#{node}', event.node_id);
+  const isActive = event.event_type === 'NODE_FAILURE' || event.event_type === 'ROUTING_FAILURE';
+
+  const item = document.createElement('div');
+  item.className = `healing-item ${isActive ? 'healing-active' : ''}`;
+  item.innerHTML = `
+    <div class="healing-top">
+      <span class="healing-action-type ${escClass}">${escalation}</span>
+      <span class="healing-confidence">Confidence: ${confRounded}</span>
+    </div>
+    <div class="healing-desc">${actionText}</div>
+    <div class="healing-detail">${selectedAction.detail} • ETA: ${selectedAction.recovery}</div>
+    ${isActive ? '<div class="healing-progress"><div class="healing-progress-bar" style="width: 0%"></div></div>' : ''}
+  `;
+
+  container.insertBefore(item, container.firstChild);
+
+  // Animate progress bar
+  if (isActive) {
+    setTimeout(() => {
+      const bar = item.querySelector('.healing-progress-bar');
+      if (bar) bar.style.width = '100%';
+    }, 100);
+  }
+
+  // Keep max 6 items
+  while (container.children.length > 6) {
+    container.removeChild(container.lastChild);
+  }
+
+  // Update status badge
+  const badge = document.getElementById('healingStatus');
+  badge.textContent = isActive ? 'ACTIVE' : 'MONITORING';
+  badge.className = `card-badge healing-badge ${isActive ? 'active' : ''}`;
+}
+
+// ============================================================
+// 15. SIMULATION ENGINE
 // ============================================================
 function processEvent(event) {
   const method = getDetectionMethod(event.event_type);
@@ -450,9 +531,10 @@ function processEvent(event) {
   // Add to event feed
   addEventToFeed(event);
 
-  // Add alert for anomalies
+  // Add alert for anomalies + trigger self-healing
   if (event.event_type !== 'NORMAL' && event.event_type !== 'INITIALIZATION') {
     addAlert(event, method);
+    triggerSelfHealing(event, method);
   }
 
   // Re-render visual components
@@ -479,6 +561,9 @@ function runSimulation() {
     document.getElementById('feedContainer').innerHTML = '<div class="feed-empty">Restarting scenario...</div>';
     document.getElementById('alertsContainer').innerHTML = '<div class="alerts-empty">No alerts yet</div>';
     document.getElementById('alertCount').textContent = '0';
+    document.getElementById('healingContainer').innerHTML = '<div class="healing-empty">No actions triggered yet</div>';
+    document.getElementById('healingStatus').textContent = 'STANDBY';
+    document.getElementById('healingStatus').className = 'card-badge healing-badge';
 
     // Small delay before restart
     setTimeout(() => {
