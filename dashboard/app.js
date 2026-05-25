@@ -623,8 +623,19 @@ function initChat() {
   const messages = document.getElementById('chatMessages');
   const suggestions = document.querySelectorAll('.chat-suggestion');
 
-  // n8n AI Assistant webhook URL — replace with your n8n cloud webhook URL
-  const N8N_CHAT_WEBHOOK = 'https://panayomer.app.n8n.cloud/webhook/skyops-chat';
+  // === CONFIG ===
+  // API key is loaded from localStorage or URL hash: index.html#key=gsk_xxx
+  const urlParams = new URLSearchParams(window.location.hash.substring(1));
+  if (urlParams.get('key')) {
+    localStorage.setItem('skyops_groq_key', urlParams.get('key'));
+    window.location.hash = ''; // Clean URL after saving
+  }
+  const GROQ_API_KEY = localStorage.getItem('skyops_groq_key') || '';
+  const GOOGLE_SHEET_ID = '178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA';
+  const SHEET_TAB = 'SkyOps Alert';
+
+  // Cache for Google Sheets data (refresh every 2 minutes)
+  let sheetsCache = { data: null, lastFetch: 0 };
 
   // Toggle chat panel
   fab.addEventListener('click', () => {
@@ -638,7 +649,130 @@ function initChat() {
     fab.classList.remove('hidden');
   });
 
-  // Send message — tries n8n AI first, falls back to local
+  // Fetch real alert data from Google Sheets (public sheet, no auth needed)
+  async function fetchSheetAlerts() {
+    const now = Date.now();
+    if (sheetsCache.data && (now - sheetsCache.lastFetch) < 120000) {
+      return sheetsCache.data; // Return cached data if less than 2 min old
+    }
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_TAB)}`;
+      const res = await fetch(url);
+      const text = await res.text();
+      // Google returns JSONP-like response, extract JSON
+      const jsonStr = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);/);
+      if (!jsonStr) return null;
+      const json = JSON.parse(jsonStr[1]);
+      const rows = json.table.rows || [];
+      const cols = json.table.cols.map(c => c.label);
+
+      const alerts = rows.map(row => {
+        const obj = {};
+        row.c.forEach((cell, i) => {
+          obj[cols[i]] = cell ? (cell.v || cell.f || '') : '';
+        });
+        return obj;
+      }).filter(a => a.Timestamp); // Filter empty rows
+
+      sheetsCache = { data: alerts, lastFetch: now };
+      console.log(`📊 Fetched ${alerts.length} alerts from Google Sheets`);
+      return alerts;
+    } catch (err) {
+      console.warn('⚠️ Could not fetch Google Sheets:', err.message);
+      return null;
+    }
+  }
+
+  // Build context string from dashboard state + Google Sheets data
+  function buildContext(sheetAlerts) {
+    let lines = [];
+
+    // Live dashboard state
+    lines.push('=== CANLI DASHBOARD VERİLERİ ===');
+    const scores = state.healthScores;
+    Object.entries(scores).forEach(([id, score]) => {
+      const status = score >= 80 ? 'Healthy' : score >= 50 ? 'Warning' : score < 30 ? 'Critical' : 'Danger';
+      lines.push(`Node #${id}: ${score}/100 (${status})`);
+    });
+    lines.push(`Toplam Event: ${state.totalEvents} | Anomali: ${state.anomalyCount}`);
+    lines.push(`Demo Adım: ${state.currentStep}/18`);
+
+    // Recent alerts from Google Sheets
+    if (sheetAlerts && sheetAlerts.length > 0) {
+      lines.push('');
+      lines.push('=== GOOGLE SHEETS ALERT GEÇMİŞİ ===');
+      lines.push(`Toplam kayıtlı alert: ${sheetAlerts.length}`);
+      const recent = sheetAlerts.slice(-5);
+      recent.forEach(a => {
+        lines.push(`[${a.Timestamp}] ${a.Node} — ${a.Severity} — ${a.Anomaly} — Confidence: ${a.Confidence} — Escalation: ${a.Escalation}`);
+      });
+    }
+
+    // Dashboard alerts
+    if (state.alerts.length > 0) {
+      lines.push('');
+      lines.push('=== SON DASHBOARD ALERTLERİ ===');
+      state.alerts.slice(-3).forEach(a => {
+        lines.push(`${a.severity}: ${a.message} (Node #${a.node_id})`);
+      });
+    }
+
+    return lines.join('\n');
+  }
+
+  // Call Groq API directly (no n8n needed)
+  async function callGroqAI(userMessage, context) {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          {
+            role: 'system',
+            content: `Sen SkyOps AI Assistant'sın — kurumsal seviye bir IoT mesh ağ izleme ve otonom yönetim platformunun AI asistanısın.
+
+Görevlerin:
+1. Ağ durumunu analiz etmek ve raporlamak
+2. Anomali tespitlerini açıklamak
+3. Kök neden analizi yapmak
+4. Aksiyon önerileri sunmak
+5. Self-healing kararlarını açıklamak
+6. Google Sheets'teki geçmiş alert verilerine dayalı trend analizi yapmak
+
+Kurallar:
+- Her zaman Türkçe yanıt ver
+- Teknik ama anlaşılır ol
+- Kısa ve net cevaplar ver (max 3-4 paragraf)
+- Emoji kullan ama abartma
+- Confidence score'lara göre escalation seviyesi öner:
+  >= 0.85: 🤖 AUTONOMOUS (otomatik aksiyon al)
+  0.50-0.84: 👤 HUMAN REVIEW (insan onayı gerekli)
+  < 0.50: 🚨 ESCALATED (üst düzey mühendise bildir)
+
+Teknoloji stack: n8n workflow orchestration, 3 uzman AI agent (Detector, Root Cause Analyzer, Action Advisor), RPL mesh protocol, Hybrid Detection (Rule Engine + LLM), Google Sheets reporting, Telegram alerts.
+
+Aşağıda hem canlı dashboard verileri hem de Google Sheets'teki geçmiş alert kayıtları var.`
+          },
+          {
+            role: 'user',
+            content: `${context}\n\nKULLANICI SORUSU: ${userMessage}`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 500
+      })
+    });
+
+    if (!response.ok) throw new Error(`Groq API error: ${response.status}`);
+    const data = await response.json();
+    return data.choices[0].message.content;
+  }
+
+  // Send message — Groq direct → n8n fallback → local fallback
   async function sendMessage(text) {
     if (!text.trim()) return;
     addUserMessage(text);
@@ -646,36 +780,19 @@ function initChat() {
     showTyping();
 
     try {
-      const response = await fetch(N8N_CHAT_WEBHOOK, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          state: {
-            healthScores: state.healthScores,
-            totalEvents: state.totalEvents,
-            anomalyCount: state.anomalyCount,
-            alerts: state.alerts.slice(-5),
-            nodeStatus: state.nodeStatus,
-            currentStep: state.currentStep
-          }
-        })
-      });
+      // Step 1: Fetch real alerts from Google Sheets
+      const sheetAlerts = await fetchSheetAlerts();
+      const context = buildContext(sheetAlerts);
 
-      if (!response.ok) throw new Error('Webhook error');
-      const data = await response.json();
+      // Step 2: Call Groq API directly
+      const aiReply = await callGroqAI(text, context);
       removeTyping();
-
-      // n8n returns { reply: "...", model: "...", timestamp: "..." }
-      const aiReply = data.reply || data[0]?.reply || 'Yanıt alınamadı.';
-      // Convert markdown-style line breaks to HTML
       const htmlReply = `<p>${aiReply.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')}</p>`;
       addAIMessage(htmlReply);
-      console.log('🤖 AI response from n8n (Groq LLM)');
+      console.log('🤖 AI response from Groq LLM (direct)');
 
     } catch (err) {
-      // Fallback: use local smart response if n8n is unreachable
-      console.warn('⚠️ n8n unreachable, using local fallback:', err.message);
+      console.warn('⚠️ Groq API error, using local fallback:', err.message);
       removeTyping();
       const fallback = generateResponse(text);
       addAIMessage(fallback + '<p class="chat-msg-hint">💡 <em>Offline mode — lokal analiz</em></p>');
