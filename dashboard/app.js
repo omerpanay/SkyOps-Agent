@@ -706,10 +706,13 @@ function initChat() {
 
   // === CONFIG ===
   // API key is loaded from localStorage or URL hash: index.html#key=gsk_xxx
-  const urlParams = new URLSearchParams(window.location.hash.substring(1));
-  if (urlParams.get('key')) {
-    localStorage.setItem('skyops_groq_key', urlParams.get('key'));
-    window.location.hash = ''; // Clean URL after saving
+  const hashStr = window.location.hash.substring(1);
+  if (hashStr) {
+    const urlParams = new URLSearchParams(hashStr);
+    if (urlParams.get('key')) {
+      localStorage.setItem('skyops_groq_key', urlParams.get('key'));
+      history.replaceState(null, '', window.location.pathname); // Clean URL without reload
+    }
   }
   const GROQ_API_KEY = localStorage.getItem('skyops_groq_key') || '';
   const GOOGLE_SHEET_ID = '178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA';
@@ -721,13 +724,13 @@ function initChat() {
   // Toggle chat panel
   fab.addEventListener('click', () => {
     panel.classList.add('open');
-    fab.classList.add('hidden');
+    fab.style.display = 'none';
     input.focus();
   });
 
   closeBtn.addEventListener('click', () => {
     panel.classList.remove('open');
-    fab.classList.remove('hidden');
+    fab.style.display = '';
   });
 
   // Fetch real alert data from Google Sheets (public sheet, no auth needed)
