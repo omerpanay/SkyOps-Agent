@@ -1,41 +1,47 @@
 {
-  "name": "SkyOps Hourly Report",
+  "name": "SkyOps Daily Report",
   "nodes": [
     {
       "parameters": {
         "rule": {
           "interval": [
             {
-              "field": "hours",
-              "hoursInterval": 1
+              "field": "days",
+              "daysInterval": 1
             }
           ]
         }
       },
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "id": "hr-trigger-001",
-      "name": "Every Hour"
+      "name": "Every Day"
     },
     {
       "parameters": {
         "operation": "read",
         "documentId": {
           "__rl": true,
-          "value": "YOUR_GOOGLE_SHEET_ID",
+          "value": "178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA",
           "mode": "id"
         },
         "sheetName": {
           "__rl": true,
-          "value": "Alert Log",
+          "value": "SkyOps Alert",
           "mode": "list"
         },
         "options": {}
       },
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [224, 0],
+      "position": [
+        224,
+        0
+      ],
       "id": "hr-read-001",
       "name": "Read Alert Log",
       "credentials": {
@@ -47,11 +53,14 @@
     },
     {
       "parameters": {
-        "jsCode": "// === HOURLY REPORT AGGREGATOR ===\nconst items = $input.all();\nconst now = new Date();\nconst oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);\n\n// Filter last hour's alerts\nconst recentAlerts = items.filter(item => {\n  const ts = new Date(item.json.Timestamp);\n  return ts >= oneHourAgo;\n});\n\nconst totalAlerts = recentAlerts.length;\n\nif (totalAlerts === 0) {\n  return [{\n    json: {\n      period: `${oneHourAgo.toISOString().slice(0,16)} → ${now.toISOString().slice(0,16)}`,\n      total_alerts: 0,\n      avg_confidence: 'N/A',\n      most_critical_node: 'None',\n      autonomous_actions: 0,\n      network_health: '100%',\n      has_data: false\n    }\n  }];\n}\n\n// Calculate stats\nconst confidences = recentAlerts\n  .map(a => parseFloat(a.json.Confidence))\n  .filter(c => !isNaN(c));\nconst avgConfidence = confidences.length > 0\n  ? (confidences.reduce((a, b) => a + b, 0) / confidences.length).toFixed(2)\n  : 'N/A';\n\n// Count by severity\nconst severityCounts = {};\nrecentAlerts.forEach(a => {\n  const sev = a.json.Severity || 'UNKNOWN';\n  severityCounts[sev] = (severityCounts[sev] || 0) + 1;\n});\n\n// Most affected node\nconst nodeCounts = {};\nrecentAlerts.forEach(a => {\n  const node = a.json.Node || 'Unknown';\n  nodeCounts[node] = (nodeCounts[node] || 0) + 1;\n});\nconst mostCriticalNode = Object.entries(nodeCounts)\n  .sort((a, b) => b[1] - a[1])[0];\n\n// Escalation breakdown\nconst autonomousCount = recentAlerts.filter(a => a.json.Escalation === 'AUTONOMOUS').length;\nconst humanReviewCount = recentAlerts.filter(a => a.json.Escalation === 'HUMAN_REVIEW').length;\nconst escalatedCount = recentAlerts.filter(a => a.json.Escalation === 'ESCALATED').length;\n\n// Network health estimate\nconst criticalCount = (severityCounts['CRITICAL'] || 0);\nconst highCount = (severityCounts['HIGH'] || 0);\nconst healthScore = Math.max(0, 100 - (criticalCount * 20) - (highCount * 10));\n\nreturn [{\n  json: {\n    period: `${oneHourAgo.toISOString().slice(0,16)} → ${now.toISOString().slice(0,16)}`,\n    total_alerts: totalAlerts,\n    avg_confidence: avgConfidence,\n    most_critical_node: mostCriticalNode ? `${mostCriticalNode[0]} (${mostCriticalNode[1]} alerts)` : 'None',\n    autonomous_actions: autonomousCount,\n    human_reviews: humanReviewCount,\n    escalated: escalatedCount,\n    network_health: `${healthScore}%`,\n    severity_breakdown: Object.entries(severityCounts).map(([k,v]) => `${k}: ${v}`).join(', '),\n    has_data: true\n  }\n}];"
+        "jsCode": "// === DAILY REPORT AGGREGATOR ===\nconst items = $input.all();\nconst now = new Date();\nconst oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);\n\n// Filter last 24 hours alerts\nconst recentAlerts = items.filter(item => {\n  const ts = new Date(item.json.Timestamp);\n  return ts >= oneDayAgo;\n});\n\nconst totalAlerts = recentAlerts.length;\n\nif (totalAlerts === 0) {\n  return [{\n    json: {\n      period: `${oneDayAgo.toISOString().slice(0,10)} → ${now.toISOString().slice(0,10)}`,\n      total_alerts: 0,\n      avg_confidence: 'N/A',\n      most_critical_node: 'None',\n      autonomous_actions: 0,\n      human_reviews: 0,\n      escalated: 0,\n      network_health: '100%',\n      severity_breakdown: 'No alerts',\n      has_data: false\n    }\n  }];\n}\n\nconst confidences = recentAlerts\n  .map(a => parseFloat(a.json.Confidence))\n  .filter(c => !isNaN(c));\nconst avgConfidence = confidences.length > 0\n  ? (confidences.reduce((a, b) => a + b, 0) / confidences.length).toFixed(2)\n  : 'N/A';\n\nconst severityCounts = {};\nrecentAlerts.forEach(a => {\n  const sev = a.json.Severity || 'UNKNOWN';\n  severityCounts[sev] = (severityCounts[sev] || 0) + 1;\n});\n\nconst nodeCounts = {};\nrecentAlerts.forEach(a => {\n  const node = a.json.Node || 'Unknown';\n  nodeCounts[node] = (nodeCounts[node] || 0) + 1;\n});\nconst mostCriticalNode = Object.entries(nodeCounts)\n  .sort((a, b) => b[1] - a[1])[0];\n\nconst autonomousCount = recentAlerts.filter(a => a.json.Escalation === 'AUTONOMOUS').length;\nconst humanReviewCount = recentAlerts.filter(a => a.json.Escalation === 'HUMAN_REVIEW').length;\nconst escalatedCount = recentAlerts.filter(a => a.json.Escalation === 'ESCALATED').length;\n\nconst criticalCount = (severityCounts['CRITICAL'] || 0);\nconst highCount = (severityCounts['HIGH'] || 0);\nconst healthScore = Math.max(0, 100 - (criticalCount * 20) - (highCount * 10));\n\nreturn [{\n  json: {\n    period: `${oneDayAgo.toISOString().slice(0,10)} → ${now.toISOString().slice(0,10)}`,\n    total_alerts: totalAlerts,\n    avg_confidence: avgConfidence,\n    most_critical_node: mostCriticalNode ? `${mostCriticalNode[0]} (${mostCriticalNode[1]} alerts)` : 'None',\n    autonomous_actions: autonomousCount,\n    human_reviews: humanReviewCount,\n    escalated: escalatedCount,\n    network_health: `${healthScore}%`,\n    severity_breakdown: Object.entries(severityCounts).map(([k,v]) => `${k}: ${v}`).join(', '),\n    has_data: true\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [448, 0],
+      "position": [
+        448,
+        0
+      ],
       "id": "hr-aggregate-001",
       "name": "Aggregate Stats"
     },
@@ -60,7 +69,7 @@
         "operation": "append",
         "documentId": {
           "__rl": true,
-          "value": "YOUR_GOOGLE_SHEET_ID",
+          "value": "178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA",
           "mode": "id"
         },
         "sheetName": {
@@ -83,7 +92,10 @@
       },
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [672, 0],
+      "position": [
+        672,
+        0
+      ],
       "id": "hr-write-001",
       "name": "Write Summary",
       "credentials": {
@@ -96,12 +108,15 @@
     {
       "parameters": {
         "chatId": "7771806225",
-        "text": "=📊 SkyOps Hourly Report\n━━━━━━━━━━━━━━━━━━━━\n📅 {{ $json.period }}\n\n📈 Total Alerts: {{ $json.total_alerts }}\n🎯 Avg Confidence: {{ $json.avg_confidence }}\n🔴 Most Critical: {{ $json.most_critical_node }}\n\n🤖 Autonomous: {{ $json.autonomous_actions }}\n👤 Human Review: {{ $json.human_reviews }}\n🚨 Escalated: {{ $json.escalated }}\n\n🛡️ Network Health: {{ $json.network_health }}\n📋 Breakdown: {{ $json.severity_breakdown }}\n━━━━━━━━━━━━━━━━━━━━\n⏰ Next report in 1 hour",
+        "text": "=📊 SkyOps Daily Report\n━━━━━━━━━━━━━━━━━━━━\n📅 {{ $json.period }}\n\n📈 Total Alerts: {{ $json.total_alerts }}\n🎯 Avg Confidence: {{ $json.avg_confidence }}\n🔴 Most Critical: {{ $json.most_critical_node }}\n\n🤖 Autonomous: {{ $json.autonomous_actions }}\n👤 Human Review: {{ $json.human_reviews }}\n🚨 Escalated: {{ $json.escalated }}\n\n🛡️ Network Health: {{ $json.network_health }}\n📋 Breakdown: {{ $json.severity_breakdown }}\n━━━━━━━━━━━━━━━━━━━━\n⏰ Next report tomorrow",
         "additionalFields": {}
       },
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [896, 0],
+      "position": [
+        896,
+        0
+      ],
       "id": "hr-telegram-001",
       "name": "Telegram Summary",
       "webhookId": "hr-telegram-webhook",
@@ -115,24 +130,48 @@
   ],
   "pinData": {},
   "connections": {
-    "Every Hour": {
+    "Every Day": {
       "main": [
-        [{ "node": "Read Alert Log", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Read Alert Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Read Alert Log": {
       "main": [
-        [{ "node": "Aggregate Stats", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Aggregate Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Aggregate Stats": {
       "main": [
-        [{ "node": "Write Summary", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Write Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Write Summary": {
       "main": [
-        [{ "node": "Telegram Summary", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Telegram Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },

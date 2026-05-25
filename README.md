@@ -209,10 +209,11 @@ SkyOps-Agent/
 ├── dashboard/
 │   ├── index.html              # Dashboard UI structure (9 panels)
 │   ├── style.css               # SKYMOD-inspired dark theme
-│   └── app.js                  # Simulation engine + chat + healing
+│   └── app.js                  # Simulation engine + AI chat + healing
 ├── SKYOps Agent.json           # n8n: Multi-Agent Pipeline + Sheets Logger
 ├── SkyOps Demo Replay.json     # n8n: Mock Data Generator
-├── SkyOps Hourly Report.json   # n8n: Hourly Summary → Sheets + Telegram
+├── SkyOps Hourly Report.json   # n8n: Daily Summary → Sheets + Telegram
+├── SkyOps AI Assistant.json    # n8n: AI Chat Agent (Groq LLM)
 └── README.md
 ```
 

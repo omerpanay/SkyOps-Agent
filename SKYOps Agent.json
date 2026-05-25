@@ -257,12 +257,12 @@
         "operation": "append",
         "documentId": {
           "__rl": true,
-          "value": "YOUR_GOOGLE_SHEET_ID",
+          "value": "178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA",
           "mode": "id"
         },
         "sheetName": {
           "__rl": true,
-          "value": "Alert Log",
+          "value": "SkyOps Alert",
           "mode": "list"
         },
         "columns": {

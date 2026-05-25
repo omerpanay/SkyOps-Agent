@@ -1,0 +1,128 @@
+{
+  "name": "SkyOps AI Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "skyops-chat",
+        "responseMode": "lastNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "id": "chat-webhook-001",
+      "name": "Chat Webhook",
+      "webhookId": "skyops-chat-webhook-001"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract user message and build context\nconst body = $input.first().json.body;\nconst userMessage = body.message || '';\nconst dashboardState = body.state || {};\n\n// Build context from dashboard state\nlet contextLines = [];\nif (dashboardState.healthScores) {\n  const scores = dashboardState.healthScores;\n  contextLines.push('Current Node Health Scores:');\n  Object.entries(scores).forEach(([id, score]) => {\n    const status = score >= 80 ? 'Healthy' : score >= 50 ? 'Warning' : score < 30 ? 'Critical' : 'Danger';\n    contextLines.push(`  Node #${id}: ${score}/100 (${status})`);\n  });\n}\nif (dashboardState.totalEvents !== undefined) {\n  contextLines.push(`Total Events Processed: ${dashboardState.totalEvents}`);\n}\nif (dashboardState.anomalyCount !== undefined) {\n  contextLines.push(`Anomalies Detected: ${dashboardState.anomalyCount}`);\n}\nif (dashboardState.alerts && dashboardState.alerts.length > 0) {\n  contextLines.push('Recent Alerts:');\n  dashboardState.alerts.slice(-5).forEach(a => {\n    contextLines.push(`  - ${a.severity}: ${a.message} (Node #${a.node_id})`);\n  });\n}\n\nconst context = contextLines.join('\\n');\n\nreturn [{\n  json: {\n    userMessage,\n    context,\n    dashboardState\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0],
+      "id": "chat-context-001",
+      "name": "Build Context"
+    },
+    {
+      "parameters": {
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Sen SkyOps AI Assistant'sın — kurumsal seviye bir IoT mesh ağ izleme platformunun AI asistanısın. Görevlerin:\\n\\n1. Ağ durumunu analiz etmek ve raporlamak\\n2. Anomali tespitlerini açıklamak\\n3. Kök neden analizi yapmak\\n4. Aksiyon önerileri sunmak\\n5. Self-healing kararlarını açıklamak\\n\\nKurallar:\\n- Her zaman Türkçe yanıt ver\\n- Teknik ama anlaşılır ol\\n- Kısa ve net cevaplar ver (max 3-4 paragraf)\\n- Emoji kullan ama abartma\\n- Confidence score'lara göre escalation seviyesi öner:\\n  >= 0.85: 🤖 AUTONOMOUS (otomatik aksiyon al)\\n  0.50-0.84: 👤 HUMAN REVIEW (insan onayı gerekli)\\n  < 0.50: 🚨 ESCALATED (üst düzey mühendise bildir)\\n\\nTeknoloji stack'in: n8n workflow orchestration, 3 uzman AI agent (Detector, Root Cause Analyzer, Action Advisor), RPL mesh protocol, Hybrid Detection (Rule Engine + LLM).\\n\\nŞu an dashboard'dan gelen canlı veriler aşağıda. Bu verilere dayalı yanıt ver.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"CANLI AĞ VERİLERİ:\\n{{ $json.context }}\\n\\nKULLANICI SORUSU: {{ $json.userMessage }}\"\n    }\n  ],\n  \"temperature\": 0.7,\n  \"max_tokens\": 500\n}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $credentials.httpHeaderAuth.value }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [440, 0],
+      "id": "chat-llm-001",
+      "name": "Groq LLM",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_GROQ_CREDENTIAL_ID",
+          "name": "Groq API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format LLM response for dashboard\nconst response = $input.first().json;\nlet aiMessage = 'Üzgünüm, şu an yanıt üretemiyorum.';\n\ntry {\n  if (response.choices && response.choices[0]) {\n    aiMessage = response.choices[0].message.content;\n  }\n} catch (e) {\n  aiMessage = 'Bir hata oluştu: ' + e.message;\n}\n\nreturn [{\n  json: {\n    reply: aiMessage,\n    model: 'llama-3.3-70b-versatile',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0],
+      "id": "chat-format-001",
+      "name": "Format Response"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Chat Webhook": {
+      "main": [
+        [
+          {
+            "node": "Build Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Context": {
+      "main": [
+        [
+          {
+            "node": "Groq LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq LLM": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "chat-v1-001",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "853bcebacb025c2f4ba85369796638b90cf63f57b3fcb1ffd2d438af059ce531"
+  },
+  "id": "SkyOpsAIChat001",
+  "tags": []
+}
