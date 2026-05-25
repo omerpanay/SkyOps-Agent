@@ -177,7 +177,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse Agent 3 output\nconst raw = $input.first().json.choices[0].message.content;\nconst clean = raw.replace(/```json|```/g, '').trim();\nlet agent3;\ntry {\n  agent3 = JSON.parse(clean);\n} catch(e) {\n  agent3 = { immediate_action: 'Manual review required', preventive_measures: [], estimated_recovery: 'Unknown', escalation_needed: true, confidence_score: 0.5 };\n}\n\n// Get all previous agent data\nconst prev = $('Agent 2 Parser').first().json;\n\n// Calculate consensus confidence (average of 3 agents)\nconst avgConfidence = (\n  (prev.agent1_confidence || 0.8) + \n  (prev.agent2_confidence || 0.7) + \n  (agent3.confidence_score || 0.7)\n) / 3;\n\n// Take the highest severity (conservative approach)\nconst severityOrder = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];\nconst maxSeverity = prev.agent1_severity || 'MEDIUM';\n\nreturn [{\n  json: {\n    method: 'MULTI_AGENT_LLM',\n    anomaly_detected: prev.agent1_anomaly_detected,\n    anomaly_type: prev.agent1_anomaly_type,\n    severity: maxSeverity,\n    affected_node: prev.node_id,\n    \n    // Agent 1 — Detector\n    explanation: prev.agent1_diagnosis,\n    \n    // Agent 2 — Root Cause\n    root_cause: prev.agent2_root_cause,\n    impact_scope: prev.agent2_impact_scope,\n    \n    // Agent 3 — Action\n    suggested_action: agent3.immediate_action,\n    preventive_measures: (agent3.preventive_measures || []).join('; '),\n    estimated_recovery: agent3.estimated_recovery,\n    escalation_needed: agent3.escalation_needed,\n    \n    // Consensus\n    consensus_confidence: Math.round(avgConfidence * 100) / 100,\n    agents_completed: '3/3',\n    \n    // Original data\n    message: prev.message,\n    health_score: prev.health_score,\n    network_summary: prev.network_summary\n  }\n}];"
+        "jsCode": "// Parse Agent 3 output\nconst raw = $input.first().json.choices[0].message.content;\nconst clean = raw.replace(/```json|```/g, '').trim();\nlet agent3;\ntry {\n  agent3 = JSON.parse(clean);\n} catch(e) {\n  agent3 = { immediate_action: 'Manual review required', preventive_measures: [], estimated_recovery: 'Unknown', escalation_needed: true, confidence_score: 0.5 };\n}\n\n// Get all previous agent data\nconst prev = $('Agent 2 Parser').first().json;\n\n// Calculate consensus confidence (average of 3 agents)\nconst avgConfidence = (\n  (prev.agent1_confidence || 0.8) + \n  (prev.agent2_confidence || 0.7) + \n  (agent3.confidence_score || 0.7)\n) / 3;\nconst roundedConf = Math.round(avgConfidence * 100) / 100;\n\n// Take the highest severity (conservative approach)\nconst maxSeverity = prev.agent1_severity || 'MEDIUM';\n\n// === ESCALATION LOGIC (Confidence-Based Guardrails) ===\nlet escalation_level, escalation_emoji;\nif (roundedConf >= 0.85) {\n  escalation_level = 'AUTONOMOUS';\n  escalation_emoji = '🤖';\n} else if (roundedConf >= 0.50) {\n  escalation_level = 'HUMAN_REVIEW';\n  escalation_emoji = '👤';\n} else {\n  escalation_level = 'ESCALATED';\n  escalation_emoji = '🚨';\n}\n\nreturn [{\n  json: {\n    method: 'MULTI_AGENT_LLM',\n    anomaly_detected: prev.agent1_anomaly_detected,\n    anomaly_type: prev.agent1_anomaly_type,\n    severity: maxSeverity,\n    affected_node: prev.node_id,\n    \n    // Agent 1 — Detector\n    explanation: prev.agent1_diagnosis,\n    \n    // Agent 2 — Root Cause\n    root_cause: prev.agent2_root_cause,\n    impact_scope: prev.agent2_impact_scope,\n    \n    // Agent 3 — Action\n    suggested_action: agent3.immediate_action,\n    preventive_measures: (agent3.preventive_measures || []).join('; '),\n    estimated_recovery: agent3.estimated_recovery,\n    escalation_needed: agent3.escalation_needed,\n    \n    // Consensus + Escalation\n    consensus_confidence: roundedConf,\n    escalation_level: escalation_level,\n    escalation_emoji: escalation_emoji,\n    agents_completed: '3/3',\n    \n    // Original data\n    message: prev.message,\n    health_score: prev.health_score,\n    network_summary: prev.network_summary\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -186,10 +186,20 @@
       "name": "Consensus Builder"
     },
     {
+      "parameters": {
+        "jsCode": "// === SELF-HEALING ENGINE ===\n// Simulates autonomous recovery actions based on escalation level\nconst data = $input.first().json;\n\nconst HEALING_ACTIONS = {\n  NODE_FAILURE: [\n    { action: 'Initiating soft restart', detail: 'Sending RST signal via RPL control plane', eta: '~2 min' },\n    { action: 'Rerouting traffic', detail: 'Updating RPL DODAG, redirecting via backup parent', eta: '~30 sec' }\n  ],\n  ROUTING_FAILURE: [\n    { action: 'Re-probing route', detail: 'Sending DIO/DIS messages to verify reachability', eta: '~45 sec' },\n    { action: 'Triggering local repair', detail: 'RPL local repair procedure initiated', eta: '~1 min' }\n  ],\n  TOPOLOGY_CHANGE: [\n    { action: 'Logging topology change', detail: 'Recording parent switch for trend analysis', eta: 'Monitoring' }\n  ]\n};\n\nconst actions = HEALING_ACTIONS[data.anomaly_type] || HEALING_ACTIONS.TOPOLOGY_CHANGE;\nconst selected = actions[Math.floor(Math.random() * actions.length)];\n\nlet healing_status;\nif (data.escalation_level === 'AUTONOMOUS') {\n  healing_status = '✅ ACTION EXECUTED';\n} else if (data.escalation_level === 'HUMAN_REVIEW') {\n  healing_status = '⏳ PENDING HUMAN APPROVAL';\n} else {\n  healing_status = '🚨 ESCALATED TO SENIOR ENGINEER';\n}\n\nreturn [{\n  json: {\n    ...data,\n    // Self-Healing fields\n    healing_action: selected.action,\n    healing_detail: selected.detail,\n    healing_eta: selected.eta,\n    healing_status: healing_status,\n    healing_auto_executed: data.escalation_level === 'AUTONOMOUS'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1840, 48],
+      "id": "self-healing-001",
+      "name": "Self-Healing Engine"
+    },
+    {
       "parameters": {},
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
-      "position": [1840, -224],
+      "position": [2064, -224],
       "id": "2b3d3324-8434-4aa1-97a8-b98dcefd92d0",
       "name": "Merge"
     },
@@ -211,19 +221,19 @@
       },
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [2048, -224],
+      "position": [2272, -224],
       "id": "55c273bf-45d6-457a-b7fb-3ad953a92d07",
       "name": "If"
     },
     {
       "parameters": {
         "chatId": "7771806225",
-        "text": "=🚨 SkyOps Multi-Agent Alert — {{ $json.severity }}\n\n📡 Node: Node #{{ $json.affected_node }}\n⚠️ Anomaly: {{ $json.anomaly_type }}\n🎯 Confidence: {{ $json.consensus_confidence }}\n\n🔍 DETECTOR: {{ $json.explanation }}\n🧬 ROOT CAUSE: {{ $json.root_cause }}\n💡 ACTION: {{ $json.suggested_action }}\n\n🛡️ Impact: {{ $json.impact_scope }}\n⏱️ Recovery: {{ $json.estimated_recovery }}\n🤖 Agents: {{ $json.agents_completed }} ✅\n\n🕐 Zaman: {{ $now }}",
+        "text": "=🚨 SkyOps Multi-Agent Alert — {{ $json.severity }}\n\n{{ $json.escalation_emoji }} Escalation: {{ $json.escalation_level }}\n📡 Node: Node #{{ $json.affected_node }}\n⚠️ Anomaly: {{ $json.anomaly_type }}\n🎯 Confidence: {{ $json.consensus_confidence }}\n\n🔍 DETECTOR: {{ $json.explanation }}\n🧬 ROOT CAUSE: {{ $json.root_cause }}\n💡 ACTION: {{ $json.suggested_action }}\n\n🔧 SELF-HEALING:\n   Action: {{ $json.healing_action }}\n   Detail: {{ $json.healing_detail }}\n   ETA: {{ $json.healing_eta }}\n   Status: {{ $json.healing_status }}\n\n🛡️ Impact: {{ $json.impact_scope }}\n⏱️ Recovery: {{ $json.estimated_recovery }}\n🤖 Agents: {{ $json.agents_completed }} ✅\n\n🕐 Zaman: {{ $now }}",
         "additionalFields": {}
       },
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [2256, -320],
+      "position": [2480, -320],
       "id": "d59131f3-906f-41ce-93e0-baef8271c547",
       "name": "Telegram Alert",
       "webhookId": "daeb3bfa-2c0b-434e-908d-3e88bcf0efd6",
@@ -238,7 +248,7 @@
       "parameters": {},
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [2256, -128],
+      "position": [2480, -128],
       "id": "8ce0109d-ad89-4896-b4d9-9e5153031ac1",
       "name": "No Operation, do nothing"
     }
@@ -297,6 +307,11 @@
       ]
     },
     "Consensus Builder": {
+      "main": [
+        [{ "node": "Self-Healing Engine", "type": "main", "index": 0 }]
+      ]
+    },
+    "Self-Healing Engine": {
       "main": [
         [{ "node": "Merge", "type": "main", "index": 1 }]
       ]
