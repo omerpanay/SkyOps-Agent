@@ -613,6 +613,16 @@ function init() {
   // Initialize live pipeline data panel
   initPipelinePanel();
   console.log('📡 Pipeline panel ready');
+
+  // Auto-open chat after 2 seconds so AI Assistant is the first thing user sees
+  setTimeout(() => {
+    const panel = document.getElementById('chatPanel');
+    const fab = document.getElementById('chatFab');
+    if (panel && fab) {
+      panel.classList.add('open');
+      fab.style.display = 'none';
+    }
+  }, 2000);
 }
 
 // ============================================================
