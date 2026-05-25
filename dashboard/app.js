@@ -609,6 +609,87 @@ function init() {
   // Initialize chat widget
   initChat();
   console.log('💬 Chat widget ready');
+
+  // Initialize live pipeline data panel
+  initPipelinePanel();
+  console.log('📡 Pipeline panel ready');
+}
+
+// ============================================================
+// 15b. LIVE PIPELINE PANEL — Google Sheets Data
+// ============================================================
+function initPipelinePanel() {
+  const SHEET_ID = '178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA';
+  const SHEET_TAB = 'SkyOps Alert';
+
+  async function fetchPipelineData() {
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_TAB)}`;
+      const res = await fetch(url);
+      const text = await res.text();
+      const jsonStr = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);/);
+      if (!jsonStr) throw new Error('Invalid response');
+      const json = JSON.parse(jsonStr[1]);
+      const rows = json.table.rows || [];
+      const cols = json.table.cols.map(c => c.label);
+
+      const alerts = rows.map(row => {
+        const obj = {};
+        row.c.forEach((cell, i) => {
+          obj[cols[i]] = cell ? (cell.v || cell.f || '') : '';
+        });
+        return obj;
+      }).filter(a => a.Timestamp);
+
+      renderPipelineData(alerts);
+    } catch (err) {
+      console.warn('Pipeline fetch error:', err);
+      document.getElementById('pipelineStatus').textContent = 'Offline';
+      document.getElementById('pipelineStatus').className = 'card-badge pipeline-status error';
+    }
+  }
+
+  function renderPipelineData(alerts) {
+    // Update status badge
+    const statusEl = document.getElementById('pipelineStatus');
+    statusEl.textContent = `🟢 ${alerts.length} Records`;
+    statusEl.className = 'card-badge pipeline-status connected';
+
+    // Calculate stats
+    const confidences = alerts.map(a => parseFloat(a.Confidence)).filter(c => !isNaN(c));
+    const avgConf = confidences.length > 0 ? (confidences.reduce((a, b) => a + b, 0) / confidences.length).toFixed(2) : '—';
+    const autonomous = alerts.filter(a => a.Escalation === 'AUTONOMOUS').length;
+    const escalated = alerts.filter(a => a.Escalation === 'ESCALATED').length;
+
+    document.getElementById('psTotalAlerts').textContent = alerts.length;
+    document.getElementById('psAvgConfidence').textContent = avgConf;
+    document.getElementById('psAutonomous').textContent = autonomous;
+    document.getElementById('psEscalated').textContent = escalated;
+
+    // Render table (most recent first)
+    const tbody = document.getElementById('pipelineTableBody');
+    const recent = [...alerts].reverse().slice(0, 15);
+
+    if (recent.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="pipeline-empty">No alerts in Google Sheets yet</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = recent.map(a => {
+      const time = String(a.Timestamp).substring(11, 19) || String(a.Timestamp).substring(0, 16);
+      return `<tr>
+        <td>${time}</td>
+        <td>${a.Node || '—'}</td>
+        <td><span class="sev-badge sev-${a.Severity}">${a.Severity}</span></td>
+        <td><span class="esc-badge esc-${a.Escalation}">${a.Escalation}</span></td>
+        <td>${a['Healing Action'] || '—'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Initial fetch + auto-refresh every 3 minutes
+  fetchPipelineData();
+  setInterval(fetchPipelineData, 180000);
 }
 
 // ============================================================

@@ -199,22 +199,104 @@
       </div>
     </section>
 
-    <!-- Anomaly Timeline -->
-    <section class="card card--timeline" id="timelineCard">
+    <!-- Live Pipeline Data from Google Sheets -->
+    <section class="card card--pipeline" id="pipelineCard">
       <div class="card-header">
-        <h2>⏱️ Anomaly Timeline</h2>
-        <span class="card-badge">18-Step Scenario</span>
+        <h2>📡 Live Pipeline Data</h2>
+        <span class="card-badge pipeline-status" id="pipelineStatus">Loading...</span>
       </div>
-      <div class="timeline-container" id="timelineContainer">
-        <div class="timeline-track" id="timelineTrack">
-          <!-- Timeline dots rendered by JS -->
+      <div class="pipeline-container" id="pipelineContainer">
+        <div class="pipeline-stats" id="pipelineStats">
+          <div class="pipeline-stat">
+            <span class="pipeline-stat-value" id="psTotalAlerts">—</span>
+            <span class="pipeline-stat-label">Total Alerts</span>
+          </div>
+          <div class="pipeline-stat">
+            <span class="pipeline-stat-value" id="psAvgConfidence">—</span>
+            <span class="pipeline-stat-label">Avg Confidence</span>
+          </div>
+          <div class="pipeline-stat">
+            <span class="pipeline-stat-value" id="psAutonomous">—</span>
+            <span class="pipeline-stat-label">Autonomous</span>
+          </div>
+          <div class="pipeline-stat">
+            <span class="pipeline-stat-value" id="psEscalated">—</span>
+            <span class="pipeline-stat-label">Escalated</span>
+          </div>
         </div>
-        <div class="timeline-labels">
-          <span>00:00</span>
-          <span>01:00</span>
-          <span>02:00</span>
-          <span>03:00</span>
-          <span>04:50</span>
+        <div class="pipeline-table-wrap">
+          <table class="pipeline-table" id="pipelineTable">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Node</th>
+                <th>Severity</th>
+                <th>Escalation</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="pipelineTableBody">
+              <tr><td colspan="5" class="pipeline-empty">Connecting to Google Sheets...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pipeline Architecture -->
+    <section class="card card--architecture" id="architectureCard">
+      <div class="card-header">
+        <h2>🏗️ Pipeline Architecture</h2>
+        <span class="card-badge">n8n × Groq × Sheets</span>
+      </div>
+      <div class="architecture-container" id="architectureContainer">
+        <div class="arch-flow">
+          <div class="arch-node arch-source">
+            <span class="arch-icon">📡</span>
+            <span class="arch-label">IoT Sensors</span>
+          </div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node arch-n8n">
+            <span class="arch-icon">⚡</span>
+            <span class="arch-label">n8n Pipeline</span>
+            <span class="arch-detail">3 AI Agents</span>
+          </div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node arch-engine">
+            <span class="arch-icon">🧠</span>
+            <span class="arch-label">Hybrid Engine</span>
+            <span class="arch-detail">Rule + LLM</span>
+          </div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node arch-healing">
+            <span class="arch-icon">🔧</span>
+            <span class="arch-label">Self-Healing</span>
+            <span class="arch-detail">Confidence Score</span>
+          </div>
+          <div class="arch-arrow-split">
+            <span>↗</span>
+            <span>→</span>
+            <span>↘</span>
+          </div>
+          <div class="arch-outputs">
+            <div class="arch-node arch-telegram">
+              <span class="arch-icon">📱</span>
+              <span class="arch-label">Telegram</span>
+            </div>
+            <div class="arch-node arch-sheets">
+              <span class="arch-icon">📊</span>
+              <span class="arch-label">Google Sheets</span>
+            </div>
+            <div class="arch-node arch-dashboard">
+              <span class="arch-icon">🖥️</span>
+              <span class="arch-label">Dashboard</span>
+            </div>
+          </div>
+        </div>
+        <div class="arch-escalation">
+          <div class="arch-esc-item esc-auto"><span>🤖</span> ≥0.85 AUTONOMOUS</div>
+          <div class="arch-esc-item esc-human"><span>👤</span> 0.50-0.84 HUMAN REVIEW</div>
+          <div class="arch-esc-item esc-escalated"><span>🚨</span> &lt;0.50 ESCALATED</div>
         </div>
       </div>
     </section>
