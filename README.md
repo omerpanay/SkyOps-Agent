@@ -196,6 +196,7 @@ open dashboard/index.html
 | **Detection** | Hybrid: Rule Engine + Multi-Agent LLM |
 | **Frontend** | Vanilla HTML/CSS/JS (zero dependencies) |
 | **Alerts** | Telegram Bot API |
+| **Reporting** | Google Sheets API (hourly summaries) |
 | **Network** | Contiki-NG / Cooja (RPL mesh simulation) |
 | **Data** | Mock Engine (18-step scenario for demo) |
 
@@ -206,11 +207,12 @@ open dashboard/index.html
 ```
 SkyOps-Agent/
 ├── dashboard/
-│   ├── index.html          # Dashboard UI structure
-│   ├── style.css           # SKYMOD-inspired dark theme
-│   └── app.js              # Simulation engine + chat + all panels
-├── SKYOps Agent.json       # n8n workflow: Multi-Agent Pipeline
-├── SkyOps Demo Replay.json # n8n workflow: Mock Data Generator
+│   ├── index.html              # Dashboard UI structure (9 panels)
+│   ├── style.css               # SKYMOD-inspired dark theme
+│   └── app.js                  # Simulation engine + chat + healing
+├── SKYOps Agent.json           # n8n: Multi-Agent Pipeline + Sheets Logger
+├── SkyOps Demo Replay.json     # n8n: Mock Data Generator
+├── SkyOps Hourly Report.json   # n8n: Hourly Summary → Sheets + Telegram
 └── README.md
 ```
 

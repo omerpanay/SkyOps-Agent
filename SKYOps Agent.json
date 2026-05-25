@@ -251,6 +251,46 @@
       "position": [2480, -128],
       "id": "8ce0109d-ad89-4896-b4d9-9e5153031ac1",
       "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Alert Log",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.format('yyyy-MM-dd HH:mm:ss') }}",
+            "Node": "=Node #{{ $json.affected_node }}",
+            "Severity": "={{ $json.severity }}",
+            "Anomaly": "={{ $json.anomaly_type }}",
+            "Confidence": "={{ $json.consensus_confidence }}",
+            "Escalation": "={{ $json.escalation_level }}",
+            "Healing Action": "={{ $json.healing_action }}",
+            "Root Cause": "={{ $json.root_cause }}"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2480, -480],
+      "id": "sheets-alert-log-001",
+      "name": "Google Sheets — Alert Log",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -323,7 +363,10 @@
     },
     "If": {
       "main": [
-        [{ "node": "Telegram Alert", "type": "main", "index": 0 }],
+        [
+          { "node": "Telegram Alert", "type": "main", "index": 0 },
+          { "node": "Google Sheets — Alert Log", "type": "main", "index": 0 }
+        ],
         [{ "node": "No Operation, do nothing", "type": "main", "index": 0 }]
       ]
     }

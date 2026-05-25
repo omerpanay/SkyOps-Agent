@@ -37,7 +37,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5678/webhook/cooja-logs",
+        "url": "YOUR_N8N_CLOUD_WEBHOOK_URL/webhook/cooja-logs",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"log_line\": \"{{ $json.raw_line }}\"\n}",
