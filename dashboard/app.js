@@ -7,35 +7,35 @@
 // 1. SCENARIO DATA — 18-step dramatik senaryo
 // ============================================================
 const SCENARIO = [
-  { step:1,  time:"00:00", node_id:"1", event_type:"NORMAL",          message:"[INFO: BR] IPv6 addresses: fe80::201:1:1:1",               severity:"LOW" },
-  { step:2,  time:"00:10", node_id:"2", event_type:"NORMAL",          message:"[INFO: App] UDP packet sent to server",                    severity:"LOW" },
-  { step:3,  time:"00:20", node_id:"3", event_type:"NORMAL",          message:"[INFO: App] UDP packet sent to server",                    severity:"LOW" },
-  { step:4,  time:"00:30", node_id:"4", event_type:"NORMAL",          message:"[INFO: App] UDP packet sent to server",                    severity:"LOW" },
-  { step:5,  time:"00:40", node_id:"5", event_type:"NORMAL",          message:"[INFO: App] UDP packet sent to server",                    severity:"LOW" },
-  { step:6,  time:"00:50", node_id:"3", event_type:"ROUTING_FAILURE", message:"[INFO: App] Not reachable yet",                            severity:"HIGH" },
-  { step:7,  time:"01:10", node_id:"3", event_type:"TOPOLOGY_CHANGE", message:"[INFO: RPL] parent switch from node2 to node1",            severity:"MEDIUM" },
-  { step:8,  time:"01:30", node_id:"4", event_type:"TOPOLOGY_CHANGE", message:"[INFO: RPL] parent switch from node3 to node2",            severity:"MEDIUM" },
-  { step:9,  time:"01:50", node_id:"3", event_type:"ROUTING_FAILURE", message:"[INFO: App] Not reachable yet",                            severity:"HIGH" },
-  { step:10, time:"02:10", node_id:"3", event_type:"NODE_FAILURE",    message:"[ERROR] Node heartbeat timeout after 3 retries",           severity:"CRITICAL" },
-  { step:11, time:"02:30", node_id:"5", event_type:"ROUTING_FAILURE", message:"[INFO: App] Not reachable yet",                            severity:"HIGH" },
-  { step:12, time:"02:50", node_id:"2", event_type:"TOPOLOGY_CHANGE", message:"[INFO: RPL] parent switch from node3 to node1",            severity:"MEDIUM" },
-  { step:13, time:"03:10", node_id:"3", event_type:"ROUTING_FAILURE", message:"[INFO: App] Attempting reconnection...",                   severity:"HIGH" },
-  { step:14, time:"03:30", node_id:"3", event_type:"NORMAL",          message:"[INFO: App] Reconnected. UDP packet sent",                 severity:"LOW" },
-  { step:15, time:"03:50", node_id:"5", event_type:"NORMAL",          message:"[INFO: App] UDP packet sent to server",                    severity:"LOW" },
-  { step:16, time:"04:10", node_id:"4", event_type:"NORMAL",          message:"[INFO: App] UDP packet sent to server",                    severity:"LOW" },
-  { step:17, time:"04:30", node_id:"2", event_type:"NORMAL",          message:"[INFO: App] Network stable, UDP sent",                     severity:"LOW" },
-  { step:18, time:"04:50", node_id:"1", event_type:"NORMAL",          message:"[INFO: BR] All nodes reachable",                           severity:"LOW" },
+  { step: 1, time: "00:00", node_id: "1", event_type: "NORMAL", message: "[INFO: BR] IPv6 addresses: fe80::201:1:1:1", severity: "LOW" },
+  { step: 2, time: "00:10", node_id: "2", event_type: "NORMAL", message: "[INFO: App] UDP packet sent to server", severity: "LOW" },
+  { step: 3, time: "00:20", node_id: "3", event_type: "NORMAL", message: "[INFO: App] UDP packet sent to server", severity: "LOW" },
+  { step: 4, time: "00:30", node_id: "4", event_type: "NORMAL", message: "[INFO: App] UDP packet sent to server", severity: "LOW" },
+  { step: 5, time: "00:40", node_id: "5", event_type: "NORMAL", message: "[INFO: App] UDP packet sent to server", severity: "LOW" },
+  { step: 6, time: "00:50", node_id: "3", event_type: "ROUTING_FAILURE", message: "[INFO: App] Not reachable yet", severity: "HIGH" },
+  { step: 7, time: "01:10", node_id: "3", event_type: "TOPOLOGY_CHANGE", message: "[INFO: RPL] parent switch from node2 to node1", severity: "MEDIUM" },
+  { step: 8, time: "01:30", node_id: "4", event_type: "TOPOLOGY_CHANGE", message: "[INFO: RPL] parent switch from node3 to node2", severity: "MEDIUM" },
+  { step: 9, time: "01:50", node_id: "3", event_type: "ROUTING_FAILURE", message: "[INFO: App] Not reachable yet", severity: "HIGH" },
+  { step: 10, time: "02:10", node_id: "3", event_type: "NODE_FAILURE", message: "[ERROR] Node heartbeat timeout after 3 retries", severity: "CRITICAL" },
+  { step: 11, time: "02:30", node_id: "5", event_type: "ROUTING_FAILURE", message: "[INFO: App] Not reachable yet", severity: "HIGH" },
+  { step: 12, time: "02:50", node_id: "2", event_type: "TOPOLOGY_CHANGE", message: "[INFO: RPL] parent switch from node3 to node1", severity: "MEDIUM" },
+  { step: 13, time: "03:10", node_id: "3", event_type: "ROUTING_FAILURE", message: "[INFO: App] Attempting reconnection...", severity: "HIGH" },
+  { step: 14, time: "03:30", node_id: "3", event_type: "NORMAL", message: "[INFO: App] Reconnected. UDP packet sent", severity: "LOW" },
+  { step: 15, time: "03:50", node_id: "5", event_type: "NORMAL", message: "[INFO: App] UDP packet sent to server", severity: "LOW" },
+  { step: 16, time: "04:10", node_id: "4", event_type: "NORMAL", message: "[INFO: App] UDP packet sent to server", severity: "LOW" },
+  { step: 17, time: "04:30", node_id: "2", event_type: "NORMAL", message: "[INFO: App] Network stable, UDP sent", severity: "LOW" },
+  { step: 18, time: "04:50", node_id: "1", event_type: "NORMAL", message: "[INFO: BR] All nodes reachable", severity: "LOW" },
 ];
 
 // ============================================================
 // 2. TOPOLOGY CONFIGURATION
 // ============================================================
 const NODES = {
-  "1": { x: 250, y: 55,  label: "Node #1", type: "Border Router", radius: 28 },
-  "2": { x: 100, y: 200, label: "Node #2", type: "UDP Client",    radius: 22 },
-  "3": { x: 250, y: 195, label: "Node #3", type: "UDP Client",    radius: 22 },
-  "4": { x: 330, y: 320, label: "Node #4", type: "UDP Client",    radius: 22 },
-  "5": { x: 420, y: 150, label: "Node #5", type: "UDP Client",    radius: 22 },
+  "1": { x: 250, y: 55, label: "Node #1", type: "Border Router", radius: 28 },
+  "2": { x: 100, y: 200, label: "Node #2", type: "UDP Client", radius: 22 },
+  "3": { x: 250, y: 195, label: "Node #3", type: "UDP Client", radius: 22 },
+  "4": { x: 330, y: 320, label: "Node #4", type: "UDP Client", radius: 22 },
+  "5": { x: 420, y: 150, label: "Node #5", type: "UDP Client", radius: 22 },
 };
 
 // Initial RPL parent links: child → parent
@@ -462,8 +462,8 @@ function triggerSelfHealing(event, method) {
 
   // Generate confidence score
   const confidence = event.event_type === 'NODE_FAILURE' ? (0.88 + Math.random() * 0.1) :
-                     event.event_type === 'ROUTING_FAILURE' ? (0.70 + Math.random() * 0.2) :
-                     (0.55 + Math.random() * 0.3);
+    event.event_type === 'ROUTING_FAILURE' ? (0.70 + Math.random() * 0.2) :
+      (0.55 + Math.random() * 0.3);
   const confRounded = Math.round(confidence * 100) / 100;
 
   // Escalation logic based on confidence
@@ -624,7 +624,7 @@ function initChat() {
   const suggestions = document.querySelectorAll('.chat-suggestion');
 
   // n8n AI Assistant webhook URL — replace with your n8n cloud webhook URL
-  const N8N_CHAT_WEBHOOK = 'YOUR_N8N_CLOUD_URL/webhook/skyops-chat';
+  const N8N_CHAT_WEBHOOK = 'https://panayomer.app.n8n.cloud/webhook/skyops-chat';
 
   // Toggle chat panel
   fab.addEventListener('click', () => {
