@@ -960,7 +960,15 @@ Aşağıda hem canlı dashboard verileri hem de Google Sheets'teki geçmiş aler
     const response = await fetch(N8N_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: userMessage, sessionId: 'dashboard-' + Date.now() })
+      body: JSON.stringify({
+        message: userMessage,
+        sessionId: 'skyops-dashboard',
+        state: {
+          healthScores: state.healthScores,
+          totalEvents: state.totalEvents,
+          anomalyCount: state.anomalyCount
+        }
+      })
     });
     if (!response.ok) throw new Error(`n8n error: ${response.status}`);
     const data = await response.json();

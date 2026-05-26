@@ -12,27 +12,44 @@
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 0],
-      "id": "chat-webhook-001",
+      "position": [0, 400],
+      "id": "chat-webhook-v2",
       "name": "Chat Webhook",
-      "webhookId": "skyops-chat-webhook-001"
+      "webhookId": "skyops-chat-v2"
     },
     {
       "parameters": {
-        "jsCode": "// Extract user message and build context\nconst body = $input.first().json.body;\nconst userMessage = body.message || '';\nconst dashboardState = body.state || {};\n\n// Build context from dashboard state\nlet contextLines = [];\nif (dashboardState.healthScores) {\n  const scores = dashboardState.healthScores;\n  contextLines.push('Current Node Health Scores:');\n  Object.entries(scores).forEach(([id, score]) => {\n    const status = score >= 80 ? 'Healthy' : score >= 50 ? 'Warning' : score < 30 ? 'Critical' : 'Danger';\n    contextLines.push(`  Node #${id}: ${score}/100 (${status})`);\n  });\n}\nif (dashboardState.totalEvents !== undefined) {\n  contextLines.push(`Total Events Processed: ${dashboardState.totalEvents}`);\n}\nif (dashboardState.anomalyCount !== undefined) {\n  contextLines.push(`Anomalies Detected: ${dashboardState.anomalyCount}`);\n}\nif (dashboardState.alerts && dashboardState.alerts.length > 0) {\n  contextLines.push('Recent Alerts:');\n  dashboardState.alerts.slice(-5).forEach(a => {\n    contextLines.push(`  - ${a.severity}: ${a.message} (Node #${a.node_id})`);\n  });\n}\n\nconst context = contextLines.join('\\n');\n\nreturn [{\n  json: {\n    userMessage,\n    context,\n    dashboardState\n  }\n}];"
+        "url": "https://docs.google.com/spreadsheets/d/178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA/gviz/tq?tqx=out:json&sheet=SkyOps%20Alert",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [220, 400],
+      "id": "fetch-sheets-v2",
+      "name": "Fetch Sheets Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "// === PARSE GOOGLE SHEETS + BUILD AI CONTEXT ===\nconst webhookData = $('Chat Webhook').first().json;\nconst body = webhookData.body || {};\nconst userMessage = body.message || '';\nconst sessionId = body.sessionId || 'default';\nconst dashboardState = body.state || {};\n\n// Parse gviz response\nconst raw = String($input.first().json.data || '');\nlet alerts = [];\ntry {\n  const match = raw.match(/google\\.visualization\\.Query\\.setResponse\\(([\\s\\S]*?)\\);/);\n  if (match) {\n    const json = JSON.parse(match[1]);\n    const rows = json.table.rows || [];\n    const cols = json.table.cols.map(c => c.label);\n    alerts = rows.map(row => {\n      const obj = {};\n      row.c.forEach((cell, i) => {\n        obj[cols[i]] = cell ? (cell.v || cell.f || '') : '';\n      });\n      return obj;\n    }).filter(a => a.Timestamp);\n  }\n} catch (e) { /* continue without data */ }\n\n// Build context\nlet ctx = `=== GOOGLE SHEETS CANLI VERİLER (${alerts.length} kayıt) ===\\n`;\nif (alerts.length > 0) {\n  const recent = alerts.slice(-20);\n  ctx += 'Son 20 Alert:\\n';\n  recent.forEach(a => {\n    ctx += `[${a.Timestamp}] ${a.Node} | ${a.Severity} | ${a.Anomaly} | Conf: ${a.Confidence} | ${a.Escalation} | Action: ${a['Healing Action'] || 'N/A'}\\n`;\n  });\n  // Stats\n  const sevCounts = {};\n  const nodeCounts = {};\n  alerts.forEach(a => {\n    sevCounts[a.Severity] = (sevCounts[a.Severity] || 0) + 1;\n    nodeCounts[a.Node] = (nodeCounts[a.Node] || 0) + 1;\n  });\n  const auto = alerts.filter(a => a.Escalation === 'AUTONOMOUS').length;\n  const human = alerts.filter(a => a.Escalation === 'HUMAN_REVIEW').length;\n  const esc = alerts.filter(a => a.Escalation === 'ESCALATED').length;\n  ctx += `\\nSeverity: ${Object.entries(sevCounts).map(([k,v]) => k+':'+v).join(', ')}`;\n  ctx += `\\nNode Dağılımı: ${Object.entries(nodeCounts).map(([k,v]) => k+':'+v).join(', ')}`;\n  ctx += `\\nEscalation: Autonomous:${auto}, Human Review:${human}, Escalated:${esc}`;\n}\n\n// Dashboard state\nif (dashboardState.healthScores) {\n  ctx += '\\n\\n=== DASHBOARD CANLI DURUM ===';\n  Object.entries(dashboardState.healthScores).forEach(([id, score]) => {\n    const s = score >= 80 ? 'Healthy' : score >= 50 ? 'Warning' : 'Critical';\n    ctx += `\\nNode #${id}: ${score}/100 (${s})`;\n  });\n}\n\nreturn [{ json: { userMessage, sessionId, sheetsContext: ctx, alertCount: alerts.length } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 0],
-      "id": "chat-context-001",
-      "name": "Build Context"
+      "position": [440, 400],
+      "id": "build-context-v2",
+      "name": "Build AI Context"
     },
     {
       "parameters": {
         "url": "https://api.groq.com/openai/v1/chat/completions",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Sen SkyOps AI Assistant'sın — kurumsal seviye bir IoT mesh ağ izleme platformunun AI asistanısın. Görevlerin:\\n\\n1. Ağ durumunu analiz etmek ve raporlamak\\n2. Anomali tespitlerini açıklamak\\n3. Kök neden analizi yapmak\\n4. Aksiyon önerileri sunmak\\n5. Self-healing kararlarını açıklamak\\n\\nKurallar:\\n- Her zaman Türkçe yanıt ver\\n- Teknik ama anlaşılır ol\\n- Kısa ve net cevaplar ver (max 3-4 paragraf)\\n- Emoji kullan ama abartma\\n- Confidence score'lara göre escalation seviyesi öner:\\n  >= 0.85: 🤖 AUTONOMOUS (otomatik aksiyon al)\\n  0.50-0.84: 👤 HUMAN REVIEW (insan onayı gerekli)\\n  < 0.50: 🚨 ESCALATED (üst düzey mühendise bildir)\\n\\nTeknoloji stack'in: n8n workflow orchestration, 3 uzman AI agent (Detector, Root Cause Analyzer, Action Advisor), RPL mesh protocol, Hybrid Detection (Rule Engine + LLM).\\n\\nŞu an dashboard'dan gelen canlı veriler aşağıda. Bu verilere dayalı yanıt ver.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"CANLI AĞ VERİLERİ:\\n{{ $json.context }}\\n\\nKULLANICI SORUSU: {{ $json.userMessage }}\"\n    }\n  ],\n  \"temperature\": 0.7,\n  \"max_tokens\": 500\n}",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Sen SkyOps AI Assistant'sın — kurumsal seviye IoT mesh ağ izleme ve otonom yönetim platformunun yapay zeka asistanısın.\\n\\n## SİSTEM MİMARİSİ\\nBu platform n8n workflow orchestration üzerine kurulmuş 3 katmanlı bir AI Automation sistemidir:\\n\\n1. Ana Pipeline (SKYOps Agent): IoT simülatöründen gelen loglar Webhook ile alınır → Log Parser → Memory Manager → Switch node'unda NORMAL eventler Rule Engine'e, anomaliler Multi-Agent LLM pipeline'ına yönlendirilir.\\n\\n2. 3 Uzman AI Agent Pipeline:\\n   - Agent 1 (Detector): Anomali tespiti ve sınıflandırma\\n   - Agent 2 (Root Cause Analyzer): Kök neden analizi\\n   - Agent 3 (Action Advisor): Aksiyon önerisi ve recovery tahmini\\n   - Consensus Builder: 3 agent çıktısını birleştirir\\n   - Self-Healing Engine: Confidence'a göre otonom aksiyon alır\\n\\n3. Escalation Mantığı:\\n   >= 0.85: 🤖 AUTONOMOUS\\n   0.50-0.84: 👤 HUMAN REVIEW\\n   < 0.50: 🚨 ESCALATED\\n\\n4. Daily Report: Günlük özet + Telegram bildirimi\\n\\n## GÖREVLERİN\\n1. Ağ durumunu Google Sheets verilerine dayanarak analiz et\\n2. Anomali tespitlerini ve kök nedenlerini açıkla\\n3. Self-healing kararlarını ve escalation mantığını açıkla\\n4. Aksiyon önerileri sun\\n5. Geçmiş verilere dayalı trend analizi yap\\n6. Sistemin mimarisini ve agentların nasıl çalıştığını açıkla\\n\\n## KURALLAR\\n- Her zaman Türkçe yanıt ver\\n- Teknik ama anlaşılır ol\\n- Kısa ve net cevaplar ver (max 3-4 paragraf)\\n- Emoji kullan ama abartma\\n- Gerçek verilere dayalı yanıt ver, tahmin yapma\\n\\n## CANLI VERİLER\\n{{ $json.sheetsContext }}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.userMessage }}\"\n    }\n  ],\n  \"temperature\": 0.7,\n  \"max_tokens\": 800\n}",
         "options": {
           "response": {
             "response": {
@@ -56,9 +73,9 @@
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
-      "position": [440, 0],
-      "id": "chat-llm-001",
-      "name": "Groq LLM",
+      "position": [660, 400],
+      "id": "groq-llm-v2",
+      "name": "Groq AI Agent",
       "credentials": {
         "httpHeaderAuth": {
           "id": "YOUR_GROQ_CREDENTIAL_ID",
@@ -68,12 +85,12 @@
     },
     {
       "parameters": {
-        "jsCode": "// Format LLM response for dashboard\nconst response = $input.first().json;\nlet aiMessage = 'Üzgünüm, şu an yanıt üretemiyorum.';\n\ntry {\n  if (response.choices && response.choices[0]) {\n    aiMessage = response.choices[0].message.content;\n  }\n} catch (e) {\n  aiMessage = 'Bir hata oluştu: ' + e.message;\n}\n\nreturn [{\n  json: {\n    reply: aiMessage,\n    model: 'llama-3.3-70b-versatile',\n    timestamp: new Date().toISOString()\n  }\n}];"
+        "jsCode": "// Format AI response for dashboard\nconst response = $input.first().json;\nlet reply = 'Üzgünüm, şu an yanıt üretemiyorum.';\n\ntry {\n  if (response.choices && response.choices[0]) {\n    reply = response.choices[0].message.content;\n  }\n} catch (e) {\n  reply = 'Bir hata oluştu: ' + e.message;\n}\n\nreturn [{\n  json: {\n    output: reply,\n    source: 'n8n-ai-agent',\n    model: 'llama-3.3-70b-versatile',\n    alertsUsed: $('Build AI Context').first().json.alertCount,\n    timestamp: new Date().toISOString()\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 0],
-      "id": "chat-format-001",
+      "position": [880, 400],
+      "id": "format-response-v2",
       "name": "Format Response"
     }
   ],
@@ -81,48 +98,34 @@
   "connections": {
     "Chat Webhook": {
       "main": [
-        [
-          {
-            "node": "Build Context",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Fetch Sheets Data", "type": "main", "index": 0 }]
       ]
     },
-    "Build Context": {
+    "Fetch Sheets Data": {
       "main": [
-        [
-          {
-            "node": "Groq LLM",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Build AI Context", "type": "main", "index": 0 }]
       ]
     },
-    "Groq LLM": {
+    "Build AI Context": {
       "main": [
-        [
-          {
-            "node": "Format Response",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Groq AI Agent", "type": "main", "index": 0 }]
+      ]
+    },
+    "Groq AI Agent": {
+      "main": [
+        [{ "node": "Format Response", "type": "main", "index": 0 }]
       ]
     }
   },
   "active": false,
   "settings": {
-    "executionOrder": "v1",
-    "binaryMode": "separate"
+    "executionOrder": "v1"
   },
-  "versionId": "chat-v1-001",
+  "versionId": "ai-assistant-v2",
   "meta": {
     "templateCredsSetupCompleted": true,
-    "instanceId": "853bcebacb025c2f4ba85369796638b90cf63f57b3fcb1ffd2d438af059ce531"
+    "instanceId": "skyops-ai-assistant-v2"
   },
-  "id": "SkyOpsAIChat001",
+  "id": "SkyOpsAIAssistantV2",
   "tags": []
 }
