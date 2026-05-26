@@ -1639,6 +1639,34 @@ body {
 .esc-human { background: rgba(234,179,8,0.12); color: #eab308; border: 1px solid rgba(234,179,8,0.3); }
 .esc-escalated { background: rgba(239,68,68,0.12); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
 
+/* Enhanced Architecture Sections */
+.arch-section {
+  margin-bottom: 16px;
+}
+.arch-section-title {
+  font-size: 0.7rem;
+  color: var(--accent);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  padding-left: 4px;
+}
+.arch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.arch-agents .arch-agent-node {
+  background: rgba(139,92,246,0.12);
+  border-color: rgba(139,92,246,0.3);
+}
+.arch-agent-node .arch-icon {
+  font-size: 1.1rem;
+}
+
 /* --- Responsive --- */
 @media (max-width: 1100px) {
   .dashboard-grid {

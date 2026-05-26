@@ -270,53 +270,95 @@
         <span class="card-badge">n8n × Groq × Sheets</span>
       </div>
       <div class="architecture-container" id="architectureContainer">
-        <div class="arch-flow">
-          <div class="arch-node arch-source">
-            <span class="arch-icon">📡</span>
-            <span class="arch-label">IoT Sensors</span>
-          </div>
-          <div class="arch-arrow">→</div>
-          <div class="arch-node arch-n8n">
-            <span class="arch-icon">⚡</span>
-            <span class="arch-label">n8n Pipeline</span>
-            <span class="arch-detail">3 AI Agents</span>
-          </div>
-          <div class="arch-arrow">→</div>
-          <div class="arch-node arch-engine">
-            <span class="arch-icon">🧠</span>
-            <span class="arch-label">Hybrid Engine</span>
-            <span class="arch-detail">Rule + LLM</span>
-          </div>
-          <div class="arch-arrow">→</div>
-          <div class="arch-node arch-healing">
-            <span class="arch-icon">🔧</span>
-            <span class="arch-label">Self-Healing</span>
-            <span class="arch-detail">Confidence Score</span>
-          </div>
-          <div class="arch-arrow-split">
-            <span>↗</span>
-            <span>→</span>
-            <span>↘</span>
-          </div>
-          <div class="arch-outputs">
-            <div class="arch-node arch-telegram">
-              <span class="arch-icon">📱</span>
-              <span class="arch-label">Telegram</span>
+        <!-- Row 1: Data Sources -->
+        <div class="arch-section">
+          <div class="arch-section-title">📡 Veri Kaynakları</div>
+          <div class="arch-row">
+            <div class="arch-node arch-source">
+              <span class="arch-icon">📡</span>
+              <span class="arch-label">IoT Sensörler</span>
+              <span class="arch-detail">Contiki-NG / Cooja</span>
             </div>
+            <div class="arch-arrow">→</div>
             <div class="arch-node arch-sheets">
               <span class="arch-icon">📊</span>
               <span class="arch-label">Google Sheets</span>
+              <span class="arch-detail">100+ Alert Kaydı</span>
             </div>
+          </div>
+        </div>
+
+        <!-- Row 2: n8n Orchestration -->
+        <div class="arch-section">
+          <div class="arch-section-title">⚡ n8n Workflow Orchestration</div>
+          <div class="arch-row">
+            <div class="arch-node arch-n8n">
+              <span class="arch-icon">🔗</span>
+              <span class="arch-label">HTTP Fetch</span>
+              <span class="arch-detail">Sheets → JSON</span>
+            </div>
+            <div class="arch-arrow">→</div>
+            <div class="arch-node arch-n8n">
+              <span class="arch-icon">📦</span>
+              <span class="arch-label">Build Context</span>
+              <span class="arch-detail">Node Stats + Alerts</span>
+            </div>
+            <div class="arch-arrow">→</div>
+            <div class="arch-node arch-engine">
+              <span class="arch-icon">🧠</span>
+              <span class="arch-label">AI Agent</span>
+              <span class="arch-detail">Llama 3.3 70B (Groq)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 3: Agent Roles -->
+        <div class="arch-section">
+          <div class="arch-section-title">🤖 Multi-Agent Reasoning</div>
+          <div class="arch-row arch-agents">
+            <div class="arch-node arch-agent-node">
+              <span class="arch-icon">🔍</span>
+              <span class="arch-label">Agent 1</span>
+              <span class="arch-detail">Anomali Detector</span>
+            </div>
+            <div class="arch-arrow">→</div>
+            <div class="arch-node arch-agent-node">
+              <span class="arch-icon">🧬</span>
+              <span class="arch-label">Agent 2</span>
+              <span class="arch-detail">Kök Neden Analizi</span>
+            </div>
+            <div class="arch-arrow">→</div>
+            <div class="arch-node arch-agent-node">
+              <span class="arch-icon">💡</span>
+              <span class="arch-label">Agent 3</span>
+              <span class="arch-detail">Aksiyon Danışmanı</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 4: Outputs -->
+        <div class="arch-section">
+          <div class="arch-section-title">📤 Çıktılar</div>
+          <div class="arch-row">
             <div class="arch-node arch-dashboard">
               <span class="arch-icon">🖥️</span>
               <span class="arch-label">Dashboard</span>
+              <span class="arch-detail">Chat + Monitoring</span>
             </div>
             <div class="arch-node arch-telegram">
               <span class="arch-icon">📱</span>
               <span class="arch-label">Telegram</span>
+              <span class="arch-detail">@SkyOpsAgent_bot</span>
+            </div>
+            <div class="arch-node arch-healing">
+              <span class="arch-icon">🔧</span>
+              <span class="arch-label">Self-Healing</span>
+              <span class="arch-detail">Otonom Aksiyon</span>
             </div>
           </div>
         </div>
+
+        <!-- Escalation -->
         <div class="arch-escalation">
           <div class="arch-esc-item esc-auto"><span>🤖</span> ≥0.85 AUTONOMOUS</div>
           <div class="arch-esc-item esc-human"><span>👤</span> 0.50-0.84 HUMAN REVIEW</div>
@@ -366,9 +408,7 @@
       <div class="chat-msg chat-msg--ai">
         <span class="chat-msg-avatar">🤖</span>
         <div class="chat-msg-bubble">
-          <p>Merhaba! Ben <strong>SkyOps AI Assistant</strong> — IoT mesh ağınızı otonom olarak izleyen ve yöneten yapay zeka asistanınızım.</p>
-          <p>🔍 <strong>Yapabileceklerim:</strong></p>
-          <p>• Ağ durumunu gerçek zamanlı analiz etme<br>• Google Sheets'teki alert geçmişini inceleme<br>• Anomali tespiti ve kök neden analizi<br>• Self-healing aksiyon önerileri<br>• Confidence-based escalation kararları</p>
+          <p>Merhaba! Ben <strong>SkyOps AI Assistant</strong> — IoT RPL mesh ağınızı otonom olarak izleyen ve yöneten yapay zeka asistanınızım.</p>
           <p class="chat-msg-hint">Aşağıdaki önerilerden birini seçin veya soru yazın 👇</p>
         </div>
       </div>
