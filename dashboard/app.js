@@ -626,7 +626,7 @@ function init() {
 }
 
 // ============================================================
-// 15b. LIVE PIPELINE PANEL — Google Sheets Data
+// 15b. LIVE PIPELINE — Google Sheets → ALL Dashboard Panels
 // ============================================================
 function initPipelinePanel() {
   const SHEET_ID = '178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA';
@@ -651,21 +651,30 @@ function initPipelinePanel() {
         return obj;
       }).filter(a => a.Timestamp);
 
+      // Distribute data to ALL panels
       renderPipelineData(alerts);
+      renderSheetsToEventFeed(alerts);
+      renderSheetsToAlertHistory(alerts);
+      renderSheetsToNodeHealth(alerts);
+      renderSheetsToSelfHealing(alerts);
+      renderSheetsToDetection(alerts);
+      renderSheetsToKPIs(alerts);
     } catch (err) {
       console.warn('Pipeline fetch error:', err);
-      document.getElementById('pipelineStatus').textContent = 'Offline';
-      document.getElementById('pipelineStatus').className = 'card-badge pipeline-status error';
+      const statusEl = document.getElementById('pipelineStatus');
+      if (statusEl) {
+        statusEl.textContent = 'Offline';
+        statusEl.className = 'card-badge pipeline-status error';
+      }
     }
   }
 
+  // === PIPELINE DATA PANEL ===
   function renderPipelineData(alerts) {
-    // Update status badge
     const statusEl = document.getElementById('pipelineStatus');
     statusEl.textContent = `🟢 ${alerts.length} Records`;
     statusEl.className = 'card-badge pipeline-status connected';
 
-    // Calculate stats
     const confidences = alerts.map(a => parseFloat(a.Confidence)).filter(c => !isNaN(c));
     const avgConf = confidences.length > 0 ? (confidences.reduce((a, b) => a + b, 0) / confidences.length).toFixed(2) : '—';
     const autonomous = alerts.filter(a => a.Escalation === 'AUTONOMOUS').length;
@@ -676,15 +685,12 @@ function initPipelinePanel() {
     document.getElementById('psAutonomous').textContent = autonomous;
     document.getElementById('psEscalated').textContent = escalated;
 
-    // Render table (most recent first)
     const tbody = document.getElementById('pipelineTableBody');
     const recent = [...alerts].reverse().slice(0, 15);
-
     if (recent.length === 0) {
       tbody.innerHTML = '<tr><td colspan="5" class="pipeline-empty">No alerts in Google Sheets yet</td></tr>';
       return;
     }
-
     tbody.innerHTML = recent.map(a => {
       const time = String(a.Timestamp).substring(11, 19) || String(a.Timestamp).substring(0, 16);
       return `<tr>
@@ -697,9 +703,174 @@ function initPipelinePanel() {
     }).join('');
   }
 
-  // Initial fetch + auto-refresh every 3 minutes
+  // === EVENT FEED from Sheets ===
+  function renderSheetsToEventFeed(alerts) {
+    const container = document.getElementById('feedContainer');
+    if (!container) return;
+
+    const recent = [...alerts].reverse().slice(0, 12);
+    recent.forEach(a => {
+      const time = String(a.Timestamp).substring(11, 16) || '--:--';
+      const nodeId = (a.Node || '').replace('Node #', '').replace('Node#', '');
+      const eventType = a.Anomaly || 'NORMAL';
+      const item = document.createElement('div');
+      item.className = 'feed-item';
+      item.innerHTML = `
+        <span class="feed-time">${time}</span>
+        <div class="feed-content">
+          <span class="feed-node">Node #${nodeId}</span>
+          <span class="feed-type type-${eventType}">${eventType.replace('_', ' ')}</span>
+          <div class="feed-message">[n8n Pipeline] ${a['Healing Action'] || eventType}</div>
+        </div>`;
+      container.insertBefore(item, container.firstChild);
+    });
+
+    // Update feed count to include Sheets data
+    const feedCountEl = document.getElementById('feedCount');
+    if (feedCountEl) {
+      const total = state.totalEvents + alerts.length;
+      feedCountEl.textContent = `${total} events`;
+    }
+  }
+
+  // === ALERT HISTORY from Sheets ===
+  function renderSheetsToAlertHistory(alerts) {
+    const container = document.getElementById('alertsContainer');
+    if (!container) return;
+
+    // Only show non-NORMAL alerts
+    const anomalies = alerts.filter(a => a.Anomaly && a.Anomaly !== 'NORMAL').reverse().slice(0, 10);
+
+    anomalies.forEach(a => {
+      const empty = container.querySelector('.alerts-empty');
+      if (empty) empty.remove();
+
+      const time = String(a.Timestamp).substring(11, 19) || '--:--:--';
+      const severity = a.Severity || 'LOW';
+      const nodeId = (a.Node || '').replace('Node #', '').replace('Node#', '');
+      const conf = parseFloat(a.Confidence) || 0;
+      const method = conf >= 0.85 ? 'Multi-Agent LLM' : conf >= 0.50 ? 'Hybrid Engine' : 'Rule Engine';
+
+      const item = document.createElement('div');
+      item.className = 'alert-item';
+      item.innerHTML = `
+        <div class="alert-top">
+          <span class="alert-severity sev-${severity}">${severity}</span>
+          <span class="alert-time">${time}</span>
+        </div>
+        <div class="alert-node">📡 Node #${nodeId} — ${(a.Anomaly || '').replace('_', ' ')}</div>
+        <div class="alert-method">🤖 ${method} Detection • Conf: ${a.Confidence}</div>`;
+      container.insertBefore(item, container.firstChild);
+    });
+
+    // Update alert count
+    const countEl = document.getElementById('alertCount');
+    if (countEl) {
+      countEl.textContent = state.alerts.length + anomalies.length;
+    }
+  }
+
+  // === NODE HEALTH from Sheets ===
+  function renderSheetsToNodeHealth(alerts) {
+    // Calculate health damage per node based on alert frequency and severity
+    const nodeDamage = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 };
+    const sevWeight = { CRITICAL: 8, HIGH: 5, MEDIUM: 3, LOW: 1 };
+
+    alerts.forEach(a => {
+      const nodeId = (a.Node || '').replace('Node #', '').replace('Node#', '');
+      if (nodeDamage[nodeId] !== undefined) {
+        nodeDamage[nodeId] += sevWeight[a.Severity] || 1;
+      }
+    });
+
+    // Apply damage to health scores (but don't go below 15)
+    Object.keys(nodeDamage).forEach(id => {
+      if (nodeDamage[id] > 0) {
+        const damage = Math.min(nodeDamage[id], 85);
+        state.healthScores[id] = Math.max(15, 100 - damage);
+      }
+    });
+
+    // Re-render gauges
+    renderGauges();
+  }
+
+  // === SELF-HEALING from Sheets ===
+  function renderSheetsToSelfHealing(alerts) {
+    const container = document.getElementById('healingContainer');
+    if (!container) return;
+
+    const withActions = alerts.filter(a => a['Healing Action'] && a['Healing Action'] !== 'No Action').reverse().slice(0, 5);
+    if (withActions.length === 0) return;
+
+    // Clear "No actions triggered yet"
+    const existing = container.querySelector('.healing-empty');
+    if (existing) existing.remove();
+
+    // Update badge
+    const badge = document.querySelector('#healingCard .card-badge');
+    if (badge) {
+      badge.textContent = `${withActions.length} Actions`;
+      badge.className = 'card-badge status-healthy';
+    }
+
+    withActions.forEach(a => {
+      const nodeId = (a.Node || '').replace('Node #', '').replace('Node#', '');
+      const time = String(a.Timestamp).substring(11, 16) || '--:--';
+      const action = a['Healing Action'] || '';
+      const esc = a.Escalation || '';
+
+      const item = document.createElement('div');
+      item.className = 'healing-item healing-active';
+      item.innerHTML = `
+        <div class="healing-header">
+          <span class="healing-action">${esc === 'AUTONOMOUS' ? '🤖' : esc === 'ESCALATED' ? '🚨' : '👤'} ${action} → Node #${nodeId}</span>
+          <span class="healing-status status-${esc === 'AUTONOMOUS' ? 'healthy' : esc === 'ESCALATED' ? 'critical' : 'warning'}">${esc}</span>
+        </div>
+        <div class="healing-detail">${time} • ${a.Anomaly || 'Unknown'} • Confidence: ${a.Confidence || '—'}</div>`;
+      container.insertBefore(item, container.firstChild);
+    });
+  }
+
+  // === DETECTION METHODS from Sheets ===
+  function renderSheetsToDetection(alerts) {
+    const anomalies = alerts.filter(a => a.Anomaly && a.Anomaly !== 'NORMAL');
+
+    // Split by confidence: high conf = LLM, low conf = Rule
+    let ruleCount = 0, llmCount = 0;
+    anomalies.forEach(a => {
+      const conf = parseFloat(a.Confidence) || 0;
+      if (conf >= 0.70) llmCount++;
+      else ruleCount++;
+    });
+
+    // Add to existing state counts
+    state.ruleDetections += ruleCount;
+    state.llmDetections += llmCount;
+    updateDonutChart();
+  }
+
+  // === KPI BAR from Sheets ===
+  function renderSheetsToKPIs(alerts) {
+    const anomalies = alerts.filter(a => a.Anomaly && a.Anomaly !== 'NORMAL');
+
+    // Update KPI values (add Sheets data to simulation data)
+    const totalEl = document.getElementById('kpiTotalEvents');
+    const anomalyEl = document.getElementById('kpiAnomalies');
+
+    if (totalEl) {
+      const simTotal = parseInt(totalEl.textContent) || 0;
+      totalEl.textContent = simTotal + alerts.length;
+    }
+    if (anomalyEl) {
+      const simAnomaly = parseInt(anomalyEl.textContent) || 0;
+      anomalyEl.textContent = simAnomaly + anomalies.length;
+    }
+  }
+
+  // Initial fetch + auto-refresh every 2 minutes
   fetchPipelineData();
-  setInterval(fetchPipelineData, 180000);
+  setInterval(fetchPipelineData, 120000);
 }
 
 // ============================================================
