@@ -39,7 +39,7 @@
       "credentials": { "groqApi": { "id": "YOUR_GROQ_CREDENTIAL_ID", "name": "Groq account" } }
     },
     {
-      "parameters": { "sessionKey": "sessionId", "contextWindowLength": 10 },
+      "parameters": { "sessionIdType": "customKey", "sessionKey": "sessionId", "contextWindowLength": 10 },
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow", "typeVersion": 1.3, "position": [500, 420],
       "id": "mem-dash", "name": "Simple Memory"
     },
@@ -67,7 +67,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const raw = $input.first().json.data || $input.first().json.body || '';\nconst rawStr = typeof raw === 'string' ? raw : JSON.stringify(raw);\nlet alerts = [];\ntry {\n  const match = rawStr.match(/google\\.visualization\\.Query\\.setResponse\\(([\\s\\S]*?)\\);/);\n  if (match) {\n    const json = JSON.parse(match[1]);\n    const cols = json.table.cols.map(c => c.label);\n    alerts = json.table.rows.map(row => {\n      const obj = {};\n      row.c.forEach((cell, i) => { obj[cols[i]] = cell ? (cell.v || cell.f || '') : ''; });\n      return obj;\n    }).filter(a => a.Timestamp);\n  }\n} catch(e) {}\n\nconst total = alerts.length;\nconst anomalies = alerts.filter(a => a.Anomaly && a.Anomaly !== 'NORMAL');\nconst critical = anomalies.filter(a => a.Severity === 'CRITICAL').length;\nconst autonomous = alerts.filter(a => a.Escalation === 'AUTONOMOUS').length;\n\nconst nodeStats = {};\nalerts.forEach(a => {\n  const n = a.Node || 'Unknown';\n  if (!nodeStats[n]) nodeStats[n] = { total: 0, anomalies: 0 };\n  nodeStats[n].total++;\n  if (a.Anomaly && a.Anomaly !== 'NORMAL') nodeStats[n].anomalies++;\n});\nconst nodeReport = Object.entries(nodeStats).map(([n, s]) => `${n}: ${s.total} olay, ${s.anomalies} anomali`).join('\\n');\n\nconst recent = [...alerts].reverse().slice(0, 5).map(a =>\n  `[${String(a.Timestamp).substring(11,19)}] ${a.Node} | ${a.Anomaly} | ${a.Severity} | ${a.Escalation}`\n).join('\\n');\n\nconst tgMsg = $('Telegram Trigger').first().json.message || {};\nconst userMessage = tgMsg.text || '';\nconst chatId = String(tgMsg.chat?.id || '');\n\nconst sheetsContext = `## AĞ VERİLERİ\\nToplam: ${total} | Anomali: ${anomalies.length} | KRİTİK: ${critical} | Otonom: ${autonomous}\\n\\n${nodeReport}\\n\\nSon 5 Olay:\\n${recent}`;\n\nreturn [{ json: { userMessage, chatId, sheetsContext } }];"
+        "jsCode": "const raw = $input.first().json.data || $input.first().json.body || '';\nconst rawStr = typeof raw === 'string' ? raw : JSON.stringify(raw);\nlet alerts = [];\ntry {\n  const match = rawStr.match(/google\\.visualization\\.Query\\.setResponse\\(([\\s\\S]*?)\\);/);\n  if (match) {\n    const json = JSON.parse(match[1]);\n    const cols = json.table.cols.map(c => c.label);\n    alerts = json.table.rows.map(row => {\n      const obj = {};\n      row.c.forEach((cell, i) => { obj[cols[i]] = cell ? (cell.v || cell.f || '') : ''; });\n      return obj;\n    }).filter(a => a.Timestamp);\n  }\n} catch(e) {}\n\nconst total = alerts.length;\nconst anomalies = alerts.filter(a => a.Anomaly && a.Anomaly !== 'NORMAL');\nconst critical = anomalies.filter(a => a.Severity === 'CRITICAL').length;\nconst autonomous = alerts.filter(a => a.Escalation === 'AUTONOMOUS').length;\n\nconst nodeStats = {};\nalerts.forEach(a => {\n  const n = a.Node || 'Unknown';\n  if (!nodeStats[n]) nodeStats[n] = { total: 0, anomalies: 0 };\n  nodeStats[n].total++;\n  if (a.Anomaly && a.Anomaly !== 'NORMAL') nodeStats[n].anomalies++;\n});\nconst nodeReport = Object.entries(nodeStats).map(([n, s]) => `${n}: ${s.total} olay, ${s.anomalies} anomali`).join('\\n');\n\nconst recent = [...alerts].reverse().slice(0, 5).map(a =>\n  `[${String(a.Timestamp).substring(11,19)}] ${a.Node} | ${a.Anomaly} | ${a.Severity} | ${a.Escalation}`\n).join('\\n');\n\nconst tgMsg = $('Telegram Trigger').first().json.message || {};\nconst userMessage = tgMsg.text || '';\nconst chatId = String(tgMsg.chat?.id || '');\n\nconst sheetsContext = `## AĞ VERİLERİ\\nToplam: ${total} | Anomali: ${anomalies.length} | KRİTİK: ${critical} | Otonom: ${autonomous}\\n\\n${nodeReport}\\n\\nSon 5 Olay:\\n${recent}`;\n\nreturn [{ json: { userMessage, chatId, sessionId: chatId, sheetsContext } }];"
       },
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [220, 600],
       "id": "build-context-tg", "name": "Build Context TG"
@@ -90,7 +90,7 @@
       "credentials": { "groqApi": { "id": "YOUR_GROQ_CREDENTIAL_ID", "name": "Groq account" } }
     },
     {
-      "parameters": { "sessionKey": "sessionId", "contextWindowLength": 10 },
+      "parameters": { "sessionIdType": "customKey", "sessionKey": "sessionId", "contextWindowLength": 10 },
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow", "typeVersion": 1.3, "position": [500, 820],
       "id": "mem-tg", "name": "Memory TG"
     },
