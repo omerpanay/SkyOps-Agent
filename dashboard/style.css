@@ -466,8 +466,15 @@ body {
   border-radius: 8px;
   margin-bottom: 4px;
   animation: feedSlideIn 0.4s ease both;
-  transition: background var(--transition-fast);
+  transition: background var(--transition-fast), opacity 0.5s ease, transform 0.5s ease;
   border-left: 3px solid transparent;
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.feed-item-new {
+  opacity: 0;
+  transform: translateX(-20px);
 }
 
 .feed-item:hover {

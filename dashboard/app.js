@@ -545,6 +545,11 @@ function init() {
 function initPipelinePanel() {
   // Uses global SHEET_ID and SHEET_TAB constants
 
+  let allAlerts = [];
+  let displayedCount = 0;
+  const BATCH_SIZE = 3;
+  const BATCH_INTERVAL = 800; // ms between each batch
+
   async function fetchPipelineData() {
     try {
       const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_TAB)}`;
@@ -556,7 +561,7 @@ function initPipelinePanel() {
       const rows = json.table.rows || [];
       const cols = json.table.cols.map(c => c.label);
 
-      const alerts = rows.map(row => {
+      allAlerts = rows.map(row => {
         const obj = {};
         row.c.forEach((cell, i) => {
           obj[cols[i]] = cell ? (cell.v || cell.f || '') : '';
@@ -564,15 +569,9 @@ function initPipelinePanel() {
         return obj;
       }).filter(a => a.Timestamp);
 
-      // Distribute data to ALL panels
-      renderPipelineData(alerts);
-      renderSheetsToEventFeed(alerts);
-      renderSheetsToAlertHistory(alerts);
-      renderSheetsToNodeHealth(alerts);
-      renderSheetsToSelfHealing(alerts);
-      renderSheetsToDetection(alerts);
-      renderSheetsToKPIs(alerts);
-      renderTimeline(alerts);
+      // Start progressive delivery
+      displayedCount = 0;
+      progressiveLoad();
     } catch (err) {
       console.warn('Pipeline fetch error:', err);
       const statusEl = document.getElementById('pipelineStatus');
@@ -583,12 +582,46 @@ function initPipelinePanel() {
     }
   }
 
+  // Progressive data delivery — events appear in batches with animation
+  function progressiveLoad() {
+    if (displayedCount >= allAlerts.length) {
+      console.log(`✅ All ${allAlerts.length} events loaded`);
+      return;
+    }
+
+    const end = Math.min(displayedCount + BATCH_SIZE, allAlerts.length);
+    const batch = allAlerts.slice(0, end);
+    const newItems = allAlerts.slice(displayedCount, end);
+
+    // Update all panels with cumulative data
+    renderPipelineData(batch);
+    renderSheetsToKPIs(batch, displayedCount === 0);
+    renderSheetsToNodeHealth(batch);
+    renderSheetsToDetection(batch, displayedCount === 0);
+
+    // Add only NEW items to feed/alert panels with animation
+    newItems.forEach(a => {
+      addEventToFeed(a);
+      addAlertToHistory(a);
+      addHealingAction(a);
+    });
+
+    // Update status
+    const statusEl = document.getElementById('pipelineStatus');
+    if (statusEl) {
+      statusEl.textContent = `⏳ ${end}/${allAlerts.length}`;
+      statusEl.className = 'card-badge pipeline-status connected';
+      if (end >= allAlerts.length) {
+        statusEl.textContent = `🟢 ${allAlerts.length} Records`;
+      }
+    }
+
+    displayedCount = end;
+    setTimeout(progressiveLoad, BATCH_INTERVAL);
+  }
+
   // === PIPELINE DATA PANEL ===
   function renderPipelineData(alerts) {
-    const statusEl = document.getElementById('pipelineStatus');
-    statusEl.textContent = `🟢 ${alerts.length} Records`;
-    statusEl.className = 'card-badge pipeline-status connected';
-
     const confidences = alerts.map(a => parseFloat(a.Confidence)).filter(c => !isNaN(c));
     const avgConf = confidences.length > 0 ? (confidences.reduce((a, b) => a + b, 0) / confidences.length).toFixed(2) : '—';
     const autonomous = alerts.filter(a => a.Escalation === 'AUTONOMOUS').length;
@@ -615,176 +648,149 @@ function initPipelinePanel() {
         <td>${a['Healing Action'] || '—'}</td>
       </tr>`;
     }).join('');
+
+    renderTimeline(alerts);
   }
 
-  // === EVENT FEED from Sheets ===
-  function renderSheetsToEventFeed(alerts) {
+  // === SINGLE EVENT → FEED (animated) ===
+  function addEventToFeed(a) {
     const container = document.getElementById('feedContainer');
     if (!container) return;
+    const time = String(a.Timestamp).substring(11, 16) || '--:--';
+    const nodeId = (a.Node || '').replace('Node #', '').replace('Node#', '');
+    const eventType = a.Anomaly || 'NORMAL';
+    const item = document.createElement('div');
+    item.className = 'feed-item feed-item-new';
+    item.innerHTML = `
+      <span class="feed-time">${time}</span>
+      <div class="feed-content">
+        <span class="feed-node">Node #${nodeId}</span>
+        <span class="feed-type type-${eventType}">${eventType.replace('_', ' ')}</span>
+        <div class="feed-message">[n8n Pipeline] ${a['Healing Action'] || eventType}</div>
+      </div>`;
+    container.insertBefore(item, container.firstChild);
+    requestAnimationFrame(() => item.classList.remove('feed-item-new'));
 
-    const recent = [...alerts].reverse().slice(0, 12);
-    recent.forEach(a => {
-      const time = String(a.Timestamp).substring(11, 16) || '--:--';
-      const nodeId = (a.Node || '').replace('Node #', '').replace('Node#', '');
-      const eventType = a.Anomaly || 'NORMAL';
-      const item = document.createElement('div');
-      item.className = 'feed-item';
-      item.innerHTML = `
-        <span class="feed-time">${time}</span>
-        <div class="feed-content">
-          <span class="feed-node">Node #${nodeId}</span>
-          <span class="feed-type type-${eventType}">${eventType.replace('_', ' ')}</span>
-          <div class="feed-message">[n8n Pipeline] ${a['Healing Action'] || eventType}</div>
-        </div>`;
-      container.insertBefore(item, container.firstChild);
-    });
+    // Trim old items
+    while (container.children.length > 15) container.removeChild(container.lastChild);
 
-    // Update feed count to include Sheets data
     const feedCountEl = document.getElementById('feedCount');
-    if (feedCountEl) {
-      const total = state.totalEvents + alerts.length;
-      feedCountEl.textContent = `${total} events`;
-    }
+    if (feedCountEl) feedCountEl.textContent = `${displayedCount + 1} events`;
   }
 
-  // === ALERT HISTORY from Sheets ===
-  function renderSheetsToAlertHistory(alerts) {
+  // === SINGLE ALERT → HISTORY (animated) ===
+  function addAlertToHistory(a) {
+    if (!a.Anomaly || a.Anomaly === 'NORMAL') return;
     const container = document.getElementById('alertsContainer');
     if (!container) return;
 
-    // Only show non-NORMAL alerts
-    const anomalies = alerts.filter(a => a.Anomaly && a.Anomaly !== 'NORMAL').reverse().slice(0, 10);
+    const empty = container.querySelector('.alerts-empty');
+    if (empty) empty.remove();
 
-    anomalies.forEach(a => {
-      const empty = container.querySelector('.alerts-empty');
-      if (empty) empty.remove();
+    const time = String(a.Timestamp).substring(11, 19) || '--:--:--';
+    const severity = a.Severity || 'LOW';
+    const nodeId = (a.Node || '').replace('Node #', '').replace('Node#', '');
+    const conf = parseFloat(a.Confidence) || 0;
+    const method = conf >= 0.85 ? 'Multi-Agent LLM' : conf >= 0.50 ? 'Hybrid Engine' : 'Rule Engine';
 
-      const time = String(a.Timestamp).substring(11, 19) || '--:--:--';
-      const severity = a.Severity || 'LOW';
-      const nodeId = (a.Node || '').replace('Node #', '').replace('Node#', '');
-      const conf = parseFloat(a.Confidence) || 0;
-      const method = conf >= 0.85 ? 'Multi-Agent LLM' : conf >= 0.50 ? 'Hybrid Engine' : 'Rule Engine';
+    const item = document.createElement('div');
+    item.className = 'alert-item feed-item-new';
+    item.innerHTML = `
+      <div class="alert-top">
+        <span class="alert-severity sev-${severity}">${severity}</span>
+        <span class="alert-time">${time}</span>
+      </div>
+      <div class="alert-node">📡 Node #${nodeId} — ${(a.Anomaly || '').replace('_', ' ')}</div>
+      <div class="alert-method">🤖 ${method} Detection • Conf: ${a.Confidence}</div>`;
+    container.insertBefore(item, container.firstChild);
+    requestAnimationFrame(() => item.classList.remove('feed-item-new'));
 
-      const item = document.createElement('div');
-      item.className = 'alert-item';
-      item.innerHTML = `
-        <div class="alert-top">
-          <span class="alert-severity sev-${severity}">${severity}</span>
-          <span class="alert-time">${time}</span>
-        </div>
-        <div class="alert-node">📡 Node #${nodeId} — ${(a.Anomaly || '').replace('_', ' ')}</div>
-        <div class="alert-method">🤖 ${method} Detection • Conf: ${a.Confidence}</div>`;
-      container.insertBefore(item, container.firstChild);
-    });
+    while (container.children.length > 12) container.removeChild(container.lastChild);
 
-    // Update alert count
     const countEl = document.getElementById('alertCount');
-    if (countEl) {
-      countEl.textContent = state.alerts.length + anomalies.length;
+    if (countEl) countEl.textContent = parseInt(countEl.textContent || '0') + 1;
+  }
+
+  // === SINGLE HEALING ACTION (animated) ===
+  function addHealingAction(a) {
+    if (!a['Healing Action'] || a['Healing Action'] === 'No Action') return;
+    const container = document.getElementById('healingContainer');
+    if (!container) return;
+
+    const existing = container.querySelector('.healing-empty');
+    if (existing) existing.remove();
+
+    const nodeId = (a.Node || '').replace('Node #', '').replace('Node#', '');
+    const time = String(a.Timestamp).substring(11, 16) || '--:--';
+    const action = a['Healing Action'] || '';
+    const esc = a.Escalation || '';
+
+    const item = document.createElement('div');
+    item.className = 'healing-item healing-active feed-item-new';
+    item.innerHTML = `
+      <div class="healing-header">
+        <span class="healing-action">${esc === 'AUTONOMOUS' ? '🤖' : esc === 'ESCALATED' ? '🚨' : '👤'} ${action} → Node #${nodeId}</span>
+        <span class="healing-status status-${esc === 'AUTONOMOUS' ? 'healthy' : esc === 'ESCALATED' ? 'critical' : 'warning'}">${esc}</span>
+      </div>
+      <div class="healing-detail">${time} • ${a.Anomaly || 'Unknown'} • Confidence: ${a.Confidence || '—'}</div>`;
+    container.insertBefore(item, container.firstChild);
+    requestAnimationFrame(() => item.classList.remove('feed-item-new'));
+
+    while (container.children.length > 6) container.removeChild(container.lastChild);
+
+    const badge = document.querySelector('#healingCard .card-badge');
+    if (badge) {
+      badge.textContent = `${container.children.length} Actions`;
+      badge.className = 'card-badge status-healthy';
     }
   }
 
-  // === NODE HEALTH from Sheets ===
+  // === NODE HEALTH from cumulative alerts ===
   function renderSheetsToNodeHealth(alerts) {
-    // Calculate health damage per node based on alert frequency and severity
     const nodeDamage = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 };
     const sevWeight = { CRITICAL: 8, HIGH: 5, MEDIUM: 3, LOW: 1 };
-
     alerts.forEach(a => {
       const nodeId = (a.Node || '').replace('Node #', '').replace('Node#', '');
       if (nodeDamage[nodeId] !== undefined) {
         nodeDamage[nodeId] += sevWeight[a.Severity] || 1;
       }
     });
-
-    // Apply damage to health scores (but don't go below 15)
     Object.keys(nodeDamage).forEach(id => {
       if (nodeDamage[id] > 0) {
         const damage = Math.min(nodeDamage[id], 85);
         state.healthScores[id] = Math.max(15, 100 - damage);
       }
     });
-
-    // Re-render gauges
     renderGauges();
   }
 
-  // === SELF-HEALING from Sheets ===
-  function renderSheetsToSelfHealing(alerts) {
-    const container = document.getElementById('healingContainer');
-    if (!container) return;
-
-    const withActions = alerts.filter(a => a['Healing Action'] && a['Healing Action'] !== 'No Action').reverse().slice(0, 5);
-    if (withActions.length === 0) return;
-
-    // Clear "No actions triggered yet"
-    const existing = container.querySelector('.healing-empty');
-    if (existing) existing.remove();
-
-    // Update badge
-    const badge = document.querySelector('#healingCard .card-badge');
-    if (badge) {
-      badge.textContent = `${withActions.length} Actions`;
-      badge.className = 'card-badge status-healthy';
-    }
-
-    withActions.forEach(a => {
-      const nodeId = (a.Node || '').replace('Node #', '').replace('Node#', '');
-      const time = String(a.Timestamp).substring(11, 16) || '--:--';
-      const action = a['Healing Action'] || '';
-      const esc = a.Escalation || '';
-
-      const item = document.createElement('div');
-      item.className = 'healing-item healing-active';
-      item.innerHTML = `
-        <div class="healing-header">
-          <span class="healing-action">${esc === 'AUTONOMOUS' ? '🤖' : esc === 'ESCALATED' ? '🚨' : '👤'} ${action} → Node #${nodeId}</span>
-          <span class="healing-status status-${esc === 'AUTONOMOUS' ? 'healthy' : esc === 'ESCALATED' ? 'critical' : 'warning'}">${esc}</span>
-        </div>
-        <div class="healing-detail">${time} • ${a.Anomaly || 'Unknown'} • Confidence: ${a.Confidence || '—'}</div>`;
-      container.insertBefore(item, container.firstChild);
-    });
-  }
-
-  // === DETECTION METHODS from Sheets ===
-  function renderSheetsToDetection(alerts) {
+  // === DETECTION METHODS from cumulative alerts ===
+  function renderSheetsToDetection(alerts, reset) {
     const anomalies = alerts.filter(a => a.Anomaly && a.Anomaly !== 'NORMAL');
-
-    // Split by confidence: high conf = LLM, low conf = Rule
     let ruleCount = 0, llmCount = 0;
     anomalies.forEach(a => {
       const conf = parseFloat(a.Confidence) || 0;
       if (conf >= 0.70) llmCount++;
       else ruleCount++;
     });
-
-    // Add to existing state counts
-    state.ruleDetections += ruleCount;
-    state.llmDetections += llmCount;
+    if (reset) { state.ruleDetections = 0; state.llmDetections = 0; }
+    state.ruleDetections = ruleCount;
+    state.llmDetections = llmCount;
     updateDonutChart();
   }
 
-  // === KPI BAR from Sheets ===
-  function renderSheetsToKPIs(alerts) {
+  // === KPI BAR from cumulative alerts ===
+  function renderSheetsToKPIs(alerts, reset) {
     const anomalies = alerts.filter(a => a.Anomaly && a.Anomaly !== 'NORMAL');
-
-    // Update KPI values (add Sheets data to simulation data)
     const totalEl = document.getElementById('kpiTotalEvents');
     const anomalyEl = document.getElementById('kpiAnomalies');
-
-    if (totalEl) {
-      const simTotal = parseInt(totalEl.textContent) || 0;
-      totalEl.textContent = simTotal + alerts.length;
-    }
-    if (anomalyEl) {
-      const simAnomaly = parseInt(anomalyEl.textContent) || 0;
-      anomalyEl.textContent = simAnomaly + anomalies.length;
-    }
+    if (totalEl) totalEl.textContent = alerts.length;
+    if (anomalyEl) anomalyEl.textContent = anomalies.length;
   }
 
-  // Initial fetch + auto-refresh every 2 minutes
+  // Initial fetch + auto-refresh every 3 minutes
   fetchPipelineData();
-  setInterval(fetchPipelineData, 120000);
+  setInterval(fetchPipelineData, 180000);
 }
 
 // ============================================================
