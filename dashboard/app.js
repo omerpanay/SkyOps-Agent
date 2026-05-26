@@ -4,28 +4,11 @@
    ========================================= */
 
 // ============================================================
-// 1. SCENARIO DATA — 18-step dramatik senaryo
+// 1. DATA SOURCE: Google Sheets (written by n8n pipeline)
 // ============================================================
-const SCENARIO = [
-  { step: 1, time: "00:00", node_id: "1", event_type: "NORMAL", message: "[INFO: BR] IPv6 addresses: fe80::201:1:1:1", severity: "LOW" },
-  { step: 2, time: "00:10", node_id: "2", event_type: "NORMAL", message: "[INFO: App] UDP packet sent to server", severity: "LOW" },
-  { step: 3, time: "00:20", node_id: "3", event_type: "NORMAL", message: "[INFO: App] UDP packet sent to server", severity: "LOW" },
-  { step: 4, time: "00:30", node_id: "4", event_type: "NORMAL", message: "[INFO: App] UDP packet sent to server", severity: "LOW" },
-  { step: 5, time: "00:40", node_id: "5", event_type: "NORMAL", message: "[INFO: App] UDP packet sent to server", severity: "LOW" },
-  { step: 6, time: "00:50", node_id: "3", event_type: "ROUTING_FAILURE", message: "[INFO: App] Not reachable yet", severity: "HIGH" },
-  { step: 7, time: "01:10", node_id: "3", event_type: "TOPOLOGY_CHANGE", message: "[INFO: RPL] parent switch from node2 to node1", severity: "MEDIUM" },
-  { step: 8, time: "01:30", node_id: "4", event_type: "TOPOLOGY_CHANGE", message: "[INFO: RPL] parent switch from node3 to node2", severity: "MEDIUM" },
-  { step: 9, time: "01:50", node_id: "3", event_type: "ROUTING_FAILURE", message: "[INFO: App] Not reachable yet", severity: "HIGH" },
-  { step: 10, time: "02:10", node_id: "3", event_type: "NODE_FAILURE", message: "[ERROR] Node heartbeat timeout after 3 retries", severity: "CRITICAL" },
-  { step: 11, time: "02:30", node_id: "5", event_type: "ROUTING_FAILURE", message: "[INFO: App] Not reachable yet", severity: "HIGH" },
-  { step: 12, time: "02:50", node_id: "2", event_type: "TOPOLOGY_CHANGE", message: "[INFO: RPL] parent switch from node3 to node1", severity: "MEDIUM" },
-  { step: 13, time: "03:10", node_id: "3", event_type: "ROUTING_FAILURE", message: "[INFO: App] Attempting reconnection...", severity: "HIGH" },
-  { step: 14, time: "03:30", node_id: "3", event_type: "NORMAL", message: "[INFO: App] Reconnected. UDP packet sent", severity: "LOW" },
-  { step: 15, time: "03:50", node_id: "5", event_type: "NORMAL", message: "[INFO: App] UDP packet sent to server", severity: "LOW" },
-  { step: 16, time: "04:10", node_id: "4", event_type: "NORMAL", message: "[INFO: App] UDP packet sent to server", severity: "LOW" },
-  { step: 17, time: "04:30", node_id: "2", event_type: "NORMAL", message: "[INFO: App] Network stable, UDP sent", severity: "LOW" },
-  { step: 18, time: "04:50", node_id: "1", event_type: "NORMAL", message: "[INFO: BR] All nodes reachable", severity: "LOW" },
-];
+// No hardcoded scenario — all data comes from Google Sheets
+const SHEET_ID = '178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA';
+const SHEET_TAB = 'SkyOps Alert';
 
 // ============================================================
 // 2. TOPOLOGY CONFIGURATION
@@ -317,26 +300,37 @@ function updateDonutChart() {
 // ============================================================
 // 10. TIMELINE RENDERER
 // ============================================================
-function renderTimeline() {
+function renderTimeline(sheetsAlerts) {
   const track = document.getElementById('timelineTrack');
+  if (!track) return;
   track.innerHTML = '';
 
-  // Progress bar
+  const alerts = sheetsAlerts || [];
+  if (alerts.length === 0) {
+    track.innerHTML = '<div class="feed-empty" style="text-align:center;padding:20px;">Loading timeline from Google Sheets...</div>';
+    return;
+  }
+
+  // Progress bar (always full since data is historical)
   const progress = document.createElement('div');
   progress.className = 'timeline-progress';
-  progress.style.width = `${(state.currentStep / SCENARIO.length) * 100}%`;
+  progress.style.width = '100%';
   track.appendChild(progress);
 
-  // Dots for each scenario step
-  SCENARIO.forEach((event, i) => {
-    const pct = (i / (SCENARIO.length - 1)) * 100;
+  // Dots for each alert (max 20 most recent)
+  const recent = alerts.slice(-20);
+  recent.forEach((a, i) => {
+    const pct = (i / (recent.length - 1)) * 100;
+    const eventType = a.Anomaly || 'NORMAL';
     const dot = document.createElement('div');
-    dot.className = `timeline-dot dot-${event.event_type} ${i >= state.currentStep ? 'future' : ''}`;
+    dot.className = `timeline-dot dot-${eventType}`;
     dot.style.left = `${Math.max(2, Math.min(98, pct))}%`;
 
+    const nodeId = (a.Node || '').replace('Node #', '').replace('Node#', '');
+    const time = String(a.Timestamp).substring(11, 16) || '--:--';
     const tooltip = document.createElement('div');
     tooltip.className = 'timeline-tooltip';
-    tooltip.textContent = `${event.time} • Node #${event.node_id} • ${event.event_type}`;
+    tooltip.textContent = `${time} • Node #${nodeId} • ${eventType}`;
     dot.appendChild(tooltip);
 
     track.appendChild(dot);
@@ -517,84 +511,17 @@ function triggerSelfHealing(event, method) {
 }
 
 // ============================================================
-// 15. SIMULATION ENGINE
+// 15. (Simulation removed — all data from Google Sheets)
 // ============================================================
-function processEvent(event) {
-  const method = getDetectionMethod(event.event_type);
-
-  // Update state
-  updateKPIs(event, method);
-
-  // Update scenario step display
-  document.getElementById('scenarioStep').textContent = `Step ${state.currentStep}/${SCENARIO.length}`;
-
-  // Add to event feed
-  addEventToFeed(event);
-
-  // Add alert for anomalies + trigger self-healing
-  if (event.event_type !== 'NORMAL' && event.event_type !== 'INITIALIZATION') {
-    addAlert(event, method);
-    triggerSelfHealing(event, method);
-  }
-
-  // Re-render visual components
-  renderTopology();
-  renderGauges();
-  updateDonutChart();
-  renderTimeline();
-}
-
-function runSimulation() {
-  if (state.currentStep >= SCENARIO.length) {
-    // Reset for next cycle
-    state.currentStep = 0;
-    state.healthScores = { "1": 100, "2": 100, "3": 100, "4": 100, "5": 100 };
-    state.links = JSON.parse(JSON.stringify(INITIAL_LINKS));
-    state.totalEvents = 0;
-    state.anomalyCount = 0;
-    state.ruleDetections = 0;
-    state.llmDetections = 0;
-    state.events = [];
-    state.alerts = [];
-
-    // Clear UI
-    document.getElementById('feedContainer').innerHTML = '<div class="feed-empty">Restarting scenario...</div>';
-    document.getElementById('alertsContainer').innerHTML = '<div class="alerts-empty">No alerts yet</div>';
-    document.getElementById('alertCount').textContent = '0';
-    document.getElementById('healingContainer').innerHTML = '<div class="healing-empty">No actions triggered yet</div>';
-    document.getElementById('healingStatus').textContent = 'STANDBY';
-    document.getElementById('healingStatus').className = 'card-badge healing-badge';
-
-    // Small delay before restart
-    setTimeout(() => {
-      document.getElementById('feedContainer').innerHTML = '<div class="feed-empty">Waiting for events...</div>';
-    }, 1500);
-    return;
-  }
-
-  const event = SCENARIO[state.currentStep];
-  state.currentStep++;
-  processEvent(event);
-}
 
 // ============================================================
-// 15. INITIALIZATION
+// 15. INITIALIZATION — No simulation, 100% Google Sheets data
 // ============================================================
 function init() {
-  // Initial render
   renderTopology();
   renderGauges();
-  renderTimeline();
   updateClock();
-
-  // Start clock
   setInterval(updateClock, 1000);
-
-  // Start simulation — new event every 3.5 seconds
-  setTimeout(() => {
-    runSimulation(); // First event immediately after 1s
-    state.intervalId = setInterval(runSimulation, 3500);
-  }, 1000);
 
   // Stagger card animations
   const cards = document.querySelectorAll('.card');
@@ -602,35 +529,21 @@ function init() {
     card.style.animationDelay = `${i * 0.1}s`;
   });
 
-  console.log('🚀 SkyOps Agent Dashboard initialized');
-  console.log('📊 18-step scenario will play automatically');
-  console.log('🔄 Scenario repeats after completion');
+  console.log('🚀 SkyOps AI Assistant initialized');
+  console.log('📡 All data from Google Sheets (n8n pipeline)');
+
+  // Initialize Google Sheets data engine (populates ALL panels)
+  initPipelinePanel();
 
   // Initialize chat widget
   initChat();
-  console.log('💬 Chat widget ready');
-
-  // Initialize live pipeline data panel
-  initPipelinePanel();
-  console.log('📡 Pipeline panel ready');
-
-  // Auto-open chat after 2 seconds so AI Assistant is the first thing user sees
-  setTimeout(() => {
-    const panel = document.getElementById('chatPanel');
-    const fab = document.getElementById('chatFab');
-    if (panel && fab) {
-      panel.classList.add('open');
-      fab.style.display = 'none';
-    }
-  }, 2000);
 }
 
 // ============================================================
 // 15b. LIVE PIPELINE — Google Sheets → ALL Dashboard Panels
 // ============================================================
 function initPipelinePanel() {
-  const SHEET_ID = '178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA';
-  const SHEET_TAB = 'SkyOps Alert';
+  // Uses global SHEET_ID and SHEET_TAB constants
 
   async function fetchPipelineData() {
     try {
@@ -659,6 +572,7 @@ function initPipelinePanel() {
       renderSheetsToSelfHealing(alerts);
       renderSheetsToDetection(alerts);
       renderSheetsToKPIs(alerts);
+      renderTimeline(alerts);
     } catch (err) {
       console.warn('Pipeline fetch error:', err);
       const statusEl = document.getElementById('pipelineStatus');
@@ -892,10 +806,14 @@ function initChat() {
     const urlParams = new URLSearchParams(hashStr);
     if (urlParams.get('key')) {
       localStorage.setItem('skyops_groq_key', urlParams.get('key'));
-      history.replaceState(null, '', window.location.pathname); // Clean URL without reload
     }
+    if (urlParams.get('n8n')) {
+      localStorage.setItem('skyops_n8n_url', urlParams.get('n8n'));
+    }
+    history.replaceState(null, '', window.location.pathname);
   }
   const GROQ_API_KEY = localStorage.getItem('skyops_groq_key') || '';
+  const N8N_WEBHOOK_URL = localStorage.getItem('skyops_n8n_url') || '';
   const GOOGLE_SHEET_ID = '178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA';
   const SHEET_TAB = 'SkyOps Alert';
 
@@ -960,7 +878,6 @@ function initChat() {
       lines.push(`Node #${id}: ${score}/100 (${status})`);
     });
     lines.push(`Toplam Event: ${state.totalEvents} | Anomali: ${state.anomalyCount}`);
-    lines.push(`Demo Adım: ${state.currentStep}/18`);
 
     // Recent alerts from Google Sheets
     if (sheetAlerts && sheetAlerts.length > 0) {
@@ -1037,7 +954,20 @@ Aşağıda hem canlı dashboard verileri hem de Google Sheets'teki geçmiş aler
     return data.choices[0].message.content;
   }
 
-  // Send message — Groq direct → n8n fallback → local fallback
+  // Call n8n AI Agent webhook
+  async function callN8nAgent(userMessage) {
+    if (!N8N_WEBHOOK_URL) throw new Error('No n8n webhook URL configured');
+    const response = await fetch(N8N_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: userMessage, sessionId: 'dashboard-' + Date.now() })
+    });
+    if (!response.ok) throw new Error(`n8n error: ${response.status}`);
+    const data = await response.json();
+    return data.output || data.text || data.response || JSON.stringify(data);
+  }
+
+  // Send message — n8n Agent first → Groq fallback → local fallback
   async function sendMessage(text) {
     if (!text.trim()) return;
     addUserMessage(text);
@@ -1045,22 +975,31 @@ Aşağıda hem canlı dashboard verileri hem de Google Sheets'teki geçmiş aler
     showTyping();
 
     try {
-      // Step 1: Fetch real alerts from Google Sheets
-      const sheetAlerts = await fetchSheetAlerts();
-      const context = buildContext(sheetAlerts);
-
-      // Step 2: Call Groq API directly
-      const aiReply = await callGroqAI(text, context);
+      // Try 1: n8n AI Agent (has full system context + tools)
+      const aiReply = await callN8nAgent(text);
       removeTyping();
       const htmlReply = `<p>${aiReply.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')}</p>`;
-      addAIMessage(htmlReply);
-      console.log('🤖 AI response from Groq LLM (direct)');
+      addAIMessage(htmlReply + '<p class="chat-msg-hint">🤖 <em>n8n AI Agent</em></p>');
+      console.log('🤖 Response from n8n AI Agent');
 
-    } catch (err) {
-      console.warn('⚠️ Groq API error, using local fallback:', err.message);
-      removeTyping();
-      const fallback = generateResponse(text);
-      addAIMessage(fallback + '<p class="chat-msg-hint">💡 <em>Offline mode — lokal analiz</em></p>');
+    } catch (n8nErr) {
+      console.warn('⚠️ n8n unavailable, trying Groq fallback:', n8nErr.message);
+      try {
+        // Try 2: Direct Groq API (with Sheets context)
+        const sheetAlerts = await fetchSheetAlerts();
+        const context = buildContext(sheetAlerts);
+        const aiReply = await callGroqAI(text, context);
+        removeTyping();
+        const htmlReply = `<p>${aiReply.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')}</p>`;
+        addAIMessage(htmlReply + '<p class="chat-msg-hint">🧠 <em>Groq LLM (fallback)</em></p>');
+        console.log('🧠 Response from Groq API (fallback)');
+
+      } catch (groqErr) {
+        console.warn('⚠️ Groq also failed, using local:', groqErr.message);
+        removeTyping();
+        const fallback = generateResponse(text);
+        addAIMessage(fallback + '<p class="chat-msg-hint">💡 <em>Offline mode</em></p>');
+      }
     }
   }
 
