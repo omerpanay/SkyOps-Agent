@@ -4,18 +4,19 @@
 
 ### Autonomous Network Intelligence for IoT Mesh Networks
 
-**Multi-Agent AI • Real-Time Dashboard • Hybrid Detection • n8n Orchestration**
+**Unified AI Agent • Real-Time Dashboard • Telegram Bot • n8n Orchestration**
 
 [![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-Dashboard-f97316?style=for-the-badge&logoColor=white)](https://omerpanay.github.io/SkyOps-Agent/dashboard/)
+[![Telegram Bot](https://img.shields.io/badge/📱_Telegram-@SkyOpsAgent__bot-0088cc?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/SkyOpsAgent_bot)
 [![n8n](https://img.shields.io/badge/n8n-Workflow_Automation-EA4B71?style=for-the-badge&logo=n8n&logoColor=white)](https://n8n.io)
-[![Groq](https://img.shields.io/badge/Groq-LLM_Inference-F55036?style=for-the-badge)](https://groq.com)
+[![Groq](https://img.shields.io/badge/Groq-Llama_3.3_70B-F55036?style=for-the-badge)](https://groq.com)
 [![License](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge)](LICENSE)
 
 ---
 
-*An enterprise-grade AI system that autonomously monitors, diagnoses, and responds to anomalies in RPL-based IoT mesh networks — powered by a 3-agent LLM pipeline and hybrid rule/AI detection.*
+*An enterprise-grade AI system that autonomously monitors, diagnoses, and responds to anomalies in RPL-based IoT mesh networks — powered by a unified AI Agent with multi-agent reasoning, dual-entry access (Dashboard + Telegram), and real Google Sheets telemetry.*
 
-**[🚀 Live Dashboard](https://omerpanay.github.io/SkyOps-Agent/dashboard/)** · **[📋 Architecture](#architecture)** · **[🤖 Multi-Agent Pipeline](#multi-agent-pipeline)** · **[⚡ Quick Start](#quick-start)**
+**[🚀 Live Dashboard](https://omerpanay.github.io/SkyOps-Agent/dashboard/)** · **[📱 Telegram Bot](https://t.me/SkyOpsAgent_bot)** · **[📋 Architecture](#architecture)** · **[⚡ Quick Start](#quick-start)**
 
 </div>
 
@@ -23,18 +24,18 @@
 
 ## 🎯 What is SkyOps Agent?
 
-SkyOps Agent is an **autonomous network operations (NetOps) AI system** that transforms raw IoT mesh network logs into actionable intelligence through:
+SkyOps Agent is an **autonomous network operations (NetOps) AI system** that transforms real IoT mesh network telemetry into actionable intelligence through:
 
 | Capability | Description |
 |---|---|
-| 🔍 **Hybrid Detection** | Rule Engine for instant (0ms) classification + Multi-Agent LLM for complex anomaly analysis |
-| 🤖 **Multi-Agent AI** | 3 specialized agents collaborate: Detector → Root Cause Analyzer → Action Advisor |
-| 📊 **Real-Time Dashboard** | 9 interactive panels with live topology map, health gauges, event feed, and AI chat |
-| 💬 **AI Chat Interface** | Conversational assistant that answers questions using live network state |
+| 🤖 **Unified AI Agent** | Single Llama-3.3-70B agent with embedded 3-agent reasoning (Detector → Root Cause → Action) |
+| 📊 **Real-Time Dashboard** | 9 interactive panels with live topology, health gauges, event feed, and AI chat |
+| 📱 **Telegram Bot** | Same AI Agent accessible via [@SkyOpsAgent_bot](https://t.me/SkyOpsAgent_bot) |
+| 💬 **AI Chat Interface** | Conversational assistant powered by real Google Sheets network data |
 | 🔧 **Self-Healing** | Autonomous recovery actions with confidence-based escalation |
 | 🛡️ **Guardrails** | Confidence scoring (0.0–1.0) with 3-tier escalation logic |
-| 📱 **Telegram Alerts** | Automated multi-agent reports delivered to operations team |
-| 🔄 **Demo-Ready** | Self-contained simulation engine — no backend required |
+| 📈 **Progressive Data Feed** | Events stream one-by-one with realistic 2-5s mesh timing |
+| 🔍 **Hybrid Detection** | Rule Engine (0ms) + Multi-Agent LLM for complex anomaly analysis |
 
 > **Design Philosophy:** Built with the same principles as enterprise AI orchestration platforms — visual workflows, multi-agent collaboration, and production-grade reliability.
 
@@ -43,122 +44,110 @@ SkyOps Agent is an **autonomous network operations (NetOps) AI system** that tra
 ## 🏗️ Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                    SkyOps Agent Architecture                      │
-├──────────────────────────────────────────────────────────────────┤
-│                                                                    │
-│  ┌─────────┐     ┌───────────┐     ┌────────────┐                │
-│  │ IoT Mesh │────▶│ n8n Cloud │────▶│  Telegram   │               │
-│  │ Network  │     │ Workflow  │     │  Alerts     │               │
-│  └─────────┘     └─────┬─────┘     └────────────┘                │
-│                         │                                          │
-│              ┌──────────┴──────────┐                              │
-│              │   Detection Layer   │                              │
-│              ├─────────┬──────────┤                              │
-│              │         │          │                              │
-│         ┌────▼───┐  ┌──▼───────────▼──────────────┐              │
-│         │  Rule  │  │   Multi-Agent LLM Pipeline   │              │
-│         │ Engine │  │                               │              │
-│         │ (0ms)  │  │  ┌──────────┐  ┌──────────┐ │              │
-│         └────┬───┘  │  │ Agent 1  │─▶│ Agent 2  │ │              │
-│              │      │  │ Detector │  │ Root     │ │              │
-│              │      │  └──────────┘  │ Cause    │ │              │
-│              │      │                └────┬─────┘ │              │
-│              │      │           ┌─────────▼─────┐ │              │
-│              │      │           │   Agent 3     │ │              │
-│              │      │           │ Action Advisor│ │              │
-│              │      │           └───────┬───────┘ │              │
-│              │      │          ┌────────▼────────┐│              │
-│              │      │          │   Consensus     ││              │
-│              │      │          │   Builder       ││              │
-│              │      │          └────────┬────────┘│              │
-│              │      └──────────────────┬─────────┘              │
-│              │                         │                          │
-│              └───────────┬─────────────┘                          │
-│                          │                                        │
-│                ┌─────────▼─────────┐                              │
-│                │   Dashboard UI    │                              │
-│                │  + AI Chat Widget │                              │
-│                └───────────────────┘                              │
-└──────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                   SkyOps Agent Architecture                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  ┌──────────────┐    ┌──────────────────────────────┐           │
+│  │ Google Sheets │───▶│     n8n Cloud Workflow        │           │
+│  │ (Telemetry)   │    │                                │           │
+│  └──────────────┘    │  ┌──────────┐  ┌───────────┐  │           │
+│                       │  │  HTTP     │  │  Build    │  │           │
+│                       │  │  Fetch    │─▶│  Context  │  │           │
+│                       │  └──────────┘  └─────┬─────┘  │           │
+│                       │                       │        │           │
+│                       │              ┌────────▼──────┐ │           │
+│                       │              │   AI Agent    │ │           │
+│                       │              │  Llama 3.3    │ │           │
+│                       │              │  70B (Groq)   │ │           │
+│                       │              │               │ │           │
+│                       │              │ ┌───────────┐ │ │           │
+│                       │              │ │ Detector  │ │ │           │
+│                       │              │ │ Root Cause│ │ │           │
+│                       │              │ │ Advisor   │ │ │           │
+│                       │              │ └───────────┘ │ │           │
+│                       │              └───────┬───────┘ │           │
+│                       └──────────────────────┼─────────┘           │
+│                                              │                     │
+│                       ┌──────────────────────┼──────────┐         │
+│                       │                      │          │         │
+│                  ┌────▼─────┐         ┌──────▼──────┐   │         │
+│                  │ Dashboard │         │  Telegram   │   │         │
+│                  │  Chat UI  │         │    Bot      │   │         │
+│                  └──────────┘         └─────────────┘   │         │
+└─────────────────────────────────────────────────────────────────┘
 ```
+
+### Dual-Entry Architecture
+
+| Entry Point | Technology | Access |
+|---|---|---|
+| 🖥️ **Dashboard** | Webhook (`POST /skyops-chat`) | [Live Demo](https://omerpanay.github.io/SkyOps-Agent/dashboard/) |
+| 📱 **Telegram** | Telegram Trigger (polling) | [@SkyOpsAgent_bot](https://t.me/SkyOpsAgent_bot) |
+
+Both entry points connect to the **same AI Agent** with the same capabilities, memory, and real-time data access.
 
 ---
 
-## 🤖 Multi-Agent Pipeline
+## 🤖 Unified AI Agent
 
-Unlike traditional single-LLM approaches, SkyOps uses a **3-agent chain** where each agent builds on the previous analysis:
+Unlike traditional multi-workflow approaches, SkyOps uses a **single unified AI Agent** with embedded multi-agent reasoning:
 
-### Agent 1 — Anomaly Detector
-```
-Input:  Raw log + health score + node history
-Output: anomaly_type, severity, confidence_score, preliminary_diagnosis
-Model:  Llama-3.1-8b-instant (via Groq)
-```
+### Embedded Agent Roles
 
-### Agent 2 — Root Cause Analyzer
-```
-Input:  Agent 1's detection + temporal context + network state
-Output: root_cause, contributing_factors, impact_scope, temporal_pattern
-Model:  Llama-3.1-8b-instant (via Groq)
-```
+| Role | Function | When Activated |
+|---|---|---|
+| 🔍 **Detector** | Anomaly classification (NODE_FAILURE, ROUTING_FAIL, LATENCY_SPIKE, TOPOLOGY_CHANGE, PACKET_LOSS) | Always — part of every analysis |
+| 🧬 **Root Cause Analyzer** | Kök neden analizi, temporal pattern, impact scope | When anomalies detected |
+| 💡 **Action Advisor** | Recovery actions, preventive measures, estimated recovery time | After root cause identified |
 
-### Agent 3 — Action Advisor
+### How It Works
+
 ```
-Input:  Agent 1 + Agent 2 outputs + full context
-Output: immediate_action, preventive_measures, estimated_recovery, escalation_needed
-Model:  Llama-3.1-8b-instant (via Groq)
+User Question → Fetch Google Sheets Data → Build Context → AI Agent → Response
+                    (HTTP Request)          (Code Node)    (Groq LLM)
 ```
 
-### Consensus Builder
-Merges all 3 agent outputs into a unified report:
-- Takes the **highest severity** (conservative approach)
-- Averages **confidence scores** across agents
-- Produces a single actionable alert
+1. **Real Data Injection**: Every query triggers a fresh Google Sheets fetch (100+ alert records)
+2. **Context Building**: Raw data is parsed into structured network statistics and recent events
+3. **AI Agent**: Llama-3.3-70B analyzes with all 3 agent roles embedded in the system prompt
+4. **Response**: Formatted, actionable analysis delivered to Dashboard or Telegram
 
-**Example Telegram Alert:**
-```
-🚨 SkyOps Multi-Agent Alert — CRITICAL
+### Escalation Logic
 
-📡 Node: Node #3
-⚠️ Anomaly: NODE_FAILURE
-🎯 Confidence: 0.91
-
-🔍 DETECTOR: Heartbeat timeout after 3 retries
-🧬 ROOT CAUSE: Progressive routing degradation
-💡 ACTION: Initiate soft restart, reroute traffic
-
-🛡️ Impact: MULTI_NODE
-⏱️ Recovery: ~2 minutes
-🤖 Agents: 3/3 ✅
-```
+| Confidence | Level | Action |
+|---|---|---|
+| **≥ 0.85** | 🤖 AUTONOMOUS | System takes action automatically |
+| **0.50 – 0.84** | 👤 HUMAN REVIEW | Alert sent for human review |
+| **< 0.50** | 🚨 ESCALATED | Immediate escalation to senior engineer |
 
 ---
 
 ## 📊 Dashboard Features
 
-The dashboard is a **self-contained web application** — no backend required. It runs a built-in 18-step demo simulation.
+The dashboard is a **real-time web application** connected to live Google Sheets telemetry and n8n AI Agent.
 
 | Panel | Description |
 |---|---|
 | 🗺️ **Network Topology** | SVG mesh map with animated links, color-coded node health |
 | 🏥 **Health Gauges** | Circular gauges (0-100) for each node with smooth transitions |
-| 📋 **Live Event Feed** | Scrollable log with severity badges and timestamps |
-| 🔔 **Alert History** | Detection alerts with severity, node, and method info |
+| 📋 **Live Event Feed** | Progressive event stream with realistic 2-5s IoT mesh timing |
+| 🔔 **Alert History** | Detection alerts with severity badges and confidence scores |
 | 🤖 **Detection Split** | Donut chart showing Rule Engine vs LLM Agent distribution |
-| 🔧 **Self-Healing Actions** | Autonomous recovery actions with progress bars and confidence scores |
-| 📊 **Detection Benchmark** | Rule Engine vs LLM vs Hybrid comparison table |
+| 🔧 **Self-Healing Actions** | Autonomous recovery actions with escalation indicators |
+| 📊 **Pipeline Status** | Real-time Google Sheets connection status and statistics |
 | ⏱️ **Anomaly Timeline** | Horizontal timeline with color-coded event markers |
-| 💬 **AI Chat** | Conversational assistant using live dashboard state |
+| 💬 **AI Chat** | Rich-formatted conversational assistant with severity badges |
+| 📱 **Telegram Banner** | Direct link to [@SkyOpsAgent_bot](https://t.me/SkyOpsAgent_bot) |
 
-### AI Chat Assistant
+### AI Chat — Rich Formatting
 
-The embedded chat widget allows natural language queries about the network:
-
-- *"What's the status of Node 3?"* → Returns real-time health score and diagnosis
-- *"Are there any problems?"* → Analyzes all nodes and highlights issues
-- *"What should I do?"* → Provides actionable recommendations based on current state
-- *"How does the system work?"* → Explains the multi-agent architecture
+Chat responses feature:
+- **Colored severity badges** (CRITICAL, HIGH, MEDIUM, LOW)
+- **Anomaly type highlights** (NODE_FAILURE, LATENCY_SPIKE, etc.)
+- **Structured lists** with proper bullet/numbered formatting
+- **Headers** for organized sections
+- **Source indicator**: 🟢 n8n AI Agent / 🟡 Groq Fallback / 🔴 Offline
 
 ---
 
@@ -167,23 +156,25 @@ The embedded chat widget allows natural language queries about the network:
 ### View Live Demo
 Visit the **[Live Dashboard](https://omerpanay.github.io/SkyOps-Agent/dashboard/)** — no setup required.
 
+### Chat via Telegram
+Message **[@SkyOpsAgent_bot](https://t.me/SkyOpsAgent_bot)** — same AI Agent, mobile-friendly.
+
 ### Run Locally
 ```bash
-# Clone the repository
 git clone https://github.com/omerpanay/SkyOps-Agent.git
 cd SkyOps-Agent
-
-# Open the dashboard
-open dashboard/index.html
-# or simply double-click the file in your file explorer
+# Open dashboard/index.html in your browser
 ```
 
-### Import n8n Workflows
+### Import n8n Workflow
 1. Install [n8n](https://n8n.io) or use n8n Cloud
-2. Import `SKYOps Agent.json` — Multi-Agent detection pipeline
-3. Import `SkyOps Demo Replay.json` — Mock data generator
-4. Configure Groq API credentials
-5. Activate both workflows
+2. Import `SkyOps AI Assistant.json` — Unified AI Agent workflow
+3. Configure credentials:
+   - **Groq API** → AI Agent LLM model
+   - **Telegram Bot** → Reply to User node
+4. Click **Publish** to activate
+
+> **Note:** Google Sheets data is fetched via public HTTP — no Google credentials needed.
 
 ---
 
@@ -191,14 +182,14 @@ open dashboard/index.html
 
 | Layer | Technology |
 |---|---|
-| **Orchestration** | n8n (workflow automation) |
-| **LLM** | Groq API (Llama-3.1-8b-instant) |
+| **Orchestration** | n8n Cloud (workflow automation) |
+| **LLM** | Groq API (Llama-3.3-70B-Versatile) |
 | **Detection** | Hybrid: Rule Engine + Multi-Agent LLM |
 | **Frontend** | Vanilla HTML/CSS/JS (zero dependencies) |
-| **Alerts** | Telegram Bot API |
-| **Reporting** | Google Sheets API (hourly summaries) |
+| **Chat** | n8n Webhook + Groq Fallback + Offline mode |
+| **Telegram** | Telegram Bot API (polling trigger) |
+| **Data** | Google Sheets (100+ real alert records) |
 | **Network** | Contiki-NG / Cooja (RPL mesh simulation) |
-| **Data** | Mock Engine (18-step scenario for demo) |
 
 ---
 
@@ -207,13 +198,11 @@ open dashboard/index.html
 ```
 SkyOps-Agent/
 ├── dashboard/
-│   ├── index.html              # Dashboard UI structure (9 panels)
-│   ├── style.css               # SKYMOD-inspired dark theme
-│   └── app.js                  # Simulation engine + AI chat + healing
-├── SKYOps Agent.json           # n8n: Multi-Agent Pipeline + Sheets Logger
-├── SkyOps Demo Replay.json     # n8n: Mock Data Generator
-├── SkyOps Hourly Report.json   # n8n: Daily Summary → Sheets + Telegram
-├── SkyOps AI Assistant.json    # n8n: AI Chat Agent (Groq LLM)
+│   ├── index.html              # Dashboard UI (9 panels + Telegram banner)
+│   ├── style.css               # Dark theme with glassmorphism effects
+│   └── app.js                  # Progressive data engine + AI chat + formatting
+├── SkyOps AI Assistant.json    # n8n: Unified AI Agent (Dashboard + Telegram)
+├── SKYOps Agent.json           # n8n: Multi-Agent Pipeline (reference)
 └── README.md
 ```
 
@@ -221,19 +210,16 @@ SkyOps-Agent/
 
 ## 🔧 Self-Healing & Confidence Escalation
 
-SkyOps doesn't just detect — it **acts**. When an anomaly is detected, the system generates a confidence score and automatically selects the appropriate response level:
+SkyOps doesn't just detect — it **acts**:
 
-| Confidence | Escalation Level | Action |
+| Action | Trigger | Method |
 |---|---|---|
-| **≥ 0.85** | 🤖 AUTONOMOUS | System takes action automatically (soft restart, reroute) |
-| **0.50 – 0.84** | 👤 HUMAN REVIEW | Alert sent, human operator reviews before action |
-| **< 0.50** | 🚨 ESCALATED | Immediately escalated to senior network engineer |
-
-**Self-Healing Actions Include:**
-- Soft restart of failed nodes via RPL control plane
-- Traffic rerouting through backup parent nodes
-- Route re-probing with DIO/DIS messages
-- RPL local repair procedure initiation
+| **Soft Restart** | NODE_FAILURE | RPL control plane restart |
+| **Traffic Rerouting** | NODE_FAILURE | Backup parent node selection |
+| **Route Re-probe** | ROUTING_FAILURE | DIO/DIS message injection |
+| **RPL Local Repair** | ROUTING_FAILURE | Local repair procedure |
+| **QoS Adjustment** | LATENCY_SPIKE | Queue management optimization |
+| **Parent Switch Log** | TOPOLOGY_CHANGE | Trend analysis + monitoring |
 
 ---
 
@@ -247,38 +233,6 @@ SkyOps doesn't just detect — it **acts**. When an anomaly is detected, the sys
 | **Cost / 1K events** | $0 | ~$0.02 | ~$0.008 |
 | **Context Awareness** | ❌ | ✅ | ✅ |
 | **Explainability** | ✅ | ⚠️ | ✅ |
-
-> **Conclusion:** The hybrid approach combines the speed and cost efficiency of rule-based detection for simple events with the context awareness of LLM agents for complex anomalies, achieving the optimal balance across all metrics.
-
----
-
-## 🔗 SkyStudio ↔ SkyOps Parallel Architecture
-
-> *This project was intentionally designed to parallel enterprise AI orchestration patterns.*
-
-| Enterprise AI Feature | SkyOps Implementation |
-|---|---|
-| Visual Workflow Canvas | n8n drag-and-drop pipeline (11 nodes) |
-| AI Agents | Hybrid AI: Rule Engine + Groq LLM Agent |
-| Multi-Agent Teams | 3 specialist agents: Detector, Root Cause, Action Advisor |
-| Enterprise Memory | Memory Manager (health score + temporal history) |
-| Guardrails & Confidence | Confidence scoring + 3-tier escalation logic |
-| 100+ Integrations | Telegram + Webhook API + Cooja IoT bridge |
-| Real-time Dashboard | Network Intelligence Dashboard (9 panels) |
-| Embed Anywhere | iFrame-ready dashboard (zero dependencies) |
-| Rollback & Retry | Self-healing node restart simulation |
-| No-code / Low-code | n8n visual builder, zero backend code needed |
-
----
-
-## 🔮 Roadmap
-
-- [ ] n8n Cloud deployment for 24/7 availability
-- [ ] Webhook integration: Dashboard ↔ n8n real-time sync
-- [ ] Additional agent: Predictive Maintenance Agent
-- [ ] Multi-network support (fleet monitoring)
-- [ ] Prometheus/Grafana metrics export
-- [ ] Role-based access control (RBAC)
 
 ---
 

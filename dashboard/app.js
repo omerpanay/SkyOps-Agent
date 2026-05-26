@@ -982,6 +982,84 @@ Aşağıda hem canlı dashboard verileri hem de Google Sheets'teki geçmiş aler
     return data.output || data.text || data.response || JSON.stringify(data);
   }
 
+  // Markdown → rich HTML for chat responses
+  function formatMarkdown(text) {
+    if (!text) return '<p>Yanıt üretilemedi.</p>';
+    let html = text
+      // Code blocks
+      .replace(/```([\s\S]*?)```/g, '<pre class="chat-code">$1</pre>')
+      .replace(/`([^`]+)`/g, '<code class="chat-inline-code">$1</code>')
+      // Headers
+      .replace(/^### (.+)$/gm, '<h4 class="chat-h4">$1</h4>')
+      .replace(/^## (.+)$/gm, '<h3 class="chat-h3">$1</h3>')
+      // Bold + italic
+      .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      // Severity badges
+      .replace(/\b(CRITICAL)\b/g, '<span class="chat-badge badge-critical">$1</span>')
+      .replace(/\b(HIGH)\b/g, '<span class="chat-badge badge-high">$1</span>')
+      .replace(/\b(MEDIUM)\b/g, '<span class="chat-badge badge-medium">$1</span>')
+      .replace(/\b(LOW)\b/g, '<span class="chat-badge badge-low">$1</span>')
+      .replace(/\b(AUTONOMOUS)\b/g, '<span class="chat-badge badge-autonomous">$1</span>')
+      .replace(/\b(ESCALATED)\b/g, '<span class="chat-badge badge-escalated">$1</span>')
+      .replace(/\b(HUMAN[_ ]REVIEW)\b/g, '<span class="chat-badge badge-review">$1</span>')
+      // Anomaly types
+      .replace(/\b(NODE_FAILURE|ROUTING_FAIL(?:URE)?|LATENCY_SPIKE|TOPOLOGY_CHANGE|PACKET_LOSS)\b/g, 
+        '<span class="chat-anomaly">$1</span>');
+    
+    // Process lines for lists and paragraphs
+    const lines = html.split('\n');
+    let result = '';
+    let inList = false;
+    let listType = '';
+    
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (!trimmed) { 
+        if (inList) { result += listType === 'ul' ? '</ul>' : '</ol>'; inList = false; }
+        return; 
+      }
+      
+      // Bullet list
+      const bulletMatch = trimmed.match(/^[\-\*•]\s+(.+)/);
+      if (bulletMatch) {
+        if (!inList || listType !== 'ul') {
+          if (inList) result += listType === 'ul' ? '</ul>' : '</ol>';
+          result += '<ul class="chat-list">';
+          inList = true; listType = 'ul';
+        }
+        result += `<li>${bulletMatch[1]}</li>`;
+        return;
+      }
+      
+      // Numbered list
+      const numMatch = trimmed.match(/^(\d+)[\.\)]\s+(.+)/);
+      if (numMatch) {
+        if (!inList || listType !== 'ol') {
+          if (inList) result += listType === 'ul' ? '</ul>' : '</ol>';
+          result += '<ol class="chat-list">';
+          inList = true; listType = 'ol';
+        }
+        result += `<li>${numMatch[2]}</li>`;
+        return;
+      }
+      
+      // Close list if not a list item
+      if (inList) { result += listType === 'ul' ? '</ul>' : '</ol>'; inList = false; }
+      
+      // Skip if already a block element
+      if (trimmed.startsWith('<h') || trimmed.startsWith('<pre')) {
+        result += trimmed;
+      } else {
+        result += `<p>${trimmed}</p>`;
+      }
+    });
+    if (inList) result += listType === 'ul' ? '</ul>' : '</ol>';
+    
+    return result;
+  }
+
   // Send message — n8n Agent first → Groq fallback → local fallback
   async function sendMessage(text) {
     if (!text.trim()) return;
@@ -990,11 +1068,10 @@ Aşağıda hem canlı dashboard verileri hem de Google Sheets'teki geçmiş aler
     showTyping();
 
     try {
-      // Try 1: n8n AI Agent (has full system context + tools)
+      // Try 1: n8n AI Agent (has full system context + Sheets data)
       const aiReply = await callN8nAgent(text);
       removeTyping();
-      const htmlReply = `<p>${aiReply.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')}</p>`;
-      addAIMessage(htmlReply + '<p class="chat-msg-hint">🤖 <em>n8n AI Agent</em></p>');
+      addAIMessage(formatMarkdown(aiReply) + '<p class="chat-msg-hint">🟢 <em>n8n AI Agent</em></p>');
       console.log('🤖 Response from n8n AI Agent');
 
     } catch (n8nErr) {
@@ -1005,15 +1082,14 @@ Aşağıda hem canlı dashboard verileri hem de Google Sheets'teki geçmiş aler
         const context = buildContext(sheetAlerts);
         const aiReply = await callGroqAI(text, context);
         removeTyping();
-        const htmlReply = `<p>${aiReply.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')}</p>`;
-        addAIMessage(htmlReply + '<p class="chat-msg-hint">🧠 <em>Groq LLM (fallback)</em></p>');
+        addAIMessage(formatMarkdown(aiReply) + '<p class="chat-msg-hint">🟡 <em>Groq LLM (fallback)</em></p>');
         console.log('🧠 Response from Groq API (fallback)');
 
       } catch (groqErr) {
         console.warn('⚠️ Groq also failed, using local:', groqErr.message);
         removeTyping();
         const fallback = generateResponse(text);
-        addAIMessage(fallback + '<p class="chat-msg-hint">💡 <em>Offline mode</em></p>');
+        addAIMessage(fallback + '<p class="chat-msg-hint">🔴 <em>Offline mode</em></p>');
       }
     }
   }
