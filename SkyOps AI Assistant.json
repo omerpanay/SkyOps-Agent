@@ -10,124 +10,28 @@
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 400],
-      "id": "chat-webhook-v3",
+      "position": [-200, 200],
+      "id": "wh-chat",
       "name": "Chat Webhook",
-      "webhookId": "skyops-chat-v3"
+      "webhookId": "skyops-chat-final"
     },
     {
       "parameters": {
-        "options": {
-          "systemMessage": "=Sen SkyOps AI Assistant'sın — kurumsal seviye IoT RPL mesh ağ izleme ve otonom yönetim platformunun yapay zeka asistanısın.\n\n## SİSTEM MİMARİSİ\nBu platform n8n workflow orchestration üzerine kurulmuş 3 katmanlı bir AI Automation sistemidir:\n\n1. **Ana Pipeline (SKYOps Agent):** Cooja/Contiki-NG IoT simülatöründen gelen loglar Webhook ile alınır → Log Parser → Memory Manager → Switch node'unda NORMAL event'ler Rule Engine'e, anomaliler ise Multi-Agent LLM pipeline'ına yönlendirilir.\n\n2. **3 Uzman AI Agent Pipeline:**\n   - Agent 1 (Detector): Anomali tespiti ve sınıflandırma\n   - Agent 2 (Root Cause Analyzer): Kök neden analizi ve temporal pattern tespiti\n   - Agent 3 (Action Advisor): Aksiyon önerisi ve recovery tahmini\n   - Consensus Builder: 3 agent çıktısını birleştirir, ortalama confidence hesaplar\n   - Self-Healing Engine: Confidence'a göre otonom aksiyon alır veya insana escalate eder\n\n3. **Escalation Mantığı:**\n   - Confidence >= 0.85: 🤖 AUTONOMOUS (otomatik aksiyon al)\n   - 0.50-0.84: 👤 HUMAN REVIEW (insan onayı gerekli)\n   - < 0.50: 🚨 ESCALATED (üst düzey mühendise bildir)\n\n4. **Daily Report:** Günlük özet hesaplanır, Summaries sheet'ine yazılır ve Telegram ile gönderilir.\n\n## ARAÇLARIN\n- **Google Sheets (SkyOps Alert):** Tüm ağ olayları, anomaliler, severity, confidence, escalation kararları ve self-healing aksiyonlarını oku. Kullanıcı anomali, alert, node durumu sorduğunda bu tool'u kullan.\n- **Google Sheets (Summaries):** Günlük istatistikler ve trend verilerini oku. Kullanıcı günlük rapor, trend, istatistik sorduğunda bu tool'u kullan.\n- **Telegram:** Acil durumlarda veya kullanıcı istediğinde Telegram'dan bildirim gönder.\n\n## GÖREVLERİN\n1. Ağ durumunu Google Sheets verilerine dayanarak analiz et\n2. Anomali tespitlerini ve kök nedenlerini açıkla\n3. Self-healing kararlarını ve escalation mantığını açıkla\n4. Aksiyon önerileri sun\n5. Geçmiş verilere dayalı trend analizi yap\n6. Sistemin mimarisini ve agent'ların nasıl çalıştığını açıkla\n\n## KURALLAR\n- Her zaman Türkçe yanıt ver\n- Teknik ama anlaşılır ol\n- Kısa ve net cevaplar ver (max 3-4 paragraf)\n- Emoji kullan ama abartma\n- Google Sheets tool'larını kullanarak gerçek verilere dayalı yanıt ver, asla tahmin yapma\n- Kullanıcıya sistemi tam biliyormuş gibi profesyonel ve güvenilir davran"
-        },
-        "promptType": "define",
-        "text": "={{ $json.body.message }}"
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nreturn [{ json: { userMessage: body.message || '', source: 'dashboard', chatId: null, sessionId: body.sessionId || 'dashboard' } }];"
       },
-      "type": "@n8n/n8n-nodes-langchain.agent",
+      "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [300, 400],
-      "id": "ai-agent-v3",
-      "name": "AI Agent"
+      "position": [0, 200],
+      "id": "prep-dashboard",
+      "name": "Prep Dashboard"
     },
     {
-      "parameters": {
-        "model": "llama-3.3-70b-versatile",
-        "options": {
-          "temperature": 0.7,
-          "maxTokensToSample": 800
-        }
-      },
-      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
-      "typeVersion": 1,
-      "position": [100, 620],
-      "id": "groq-model-v3",
-      "name": "Groq Chat Model",
-      "credentials": {
-        "groqApi": {
-          "id": "YOUR_GROQ_CREDENTIAL_ID",
-          "name": "Groq account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "sessionKey": "sessionId",
-        "contextWindowLength": 10
-      },
-      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
-      "typeVersion": 1.3,
-      "position": [260, 620],
-      "id": "memory-v3",
-      "name": "Simple Memory"
-    },
-    {
-      "parameters": {
-        "operation": "read",
-        "documentId": {
-          "__rl": true,
-          "value": "178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "SkyOps Alert",
-          "mode": "list"
-        },
-        "options": {},
-        "toolDescription": "Reads all network alert logs including Timestamp, Node, Severity, Anomaly type, Confidence score, Escalation decision, and Healing Action taken. Use this tool when the user asks about alerts, anomalies, node status, network health, or recent events."
-      },
-      "type": "n8n-nodes-base.googleSheetsTool",
-      "typeVersion": 4.5,
-      "position": [420, 620],
-      "id": "sheets-alerts-tool-v3",
-      "name": "Read Alert Log",
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "YOUR_GOOGLE_CREDENTIAL_ID",
-          "name": "Google Sheets account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "read",
-        "documentId": {
-          "__rl": true,
-          "value": "178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "Summaries",
-          "mode": "list"
-        },
-        "options": {},
-        "toolDescription": "Reads daily summary reports with period, total alerts, average confidence, most critical node, autonomous action count, and network health percentage. Use when user asks about daily reports, trends, or historical statistics."
-      },
-      "type": "n8n-nodes-base.googleSheetsTool",
-      "typeVersion": 4.5,
-      "position": [560, 620],
-      "id": "sheets-summary-tool-v3",
-      "name": "Read Summaries",
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "YOUR_GOOGLE_CREDENTIAL_ID",
-          "name": "Google Sheets account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "chatId": "7771806225",
-        "text": "={{ $fromAI('message', 'The message to send via Telegram') }}",
-        "additionalFields": {},
-        "toolDescription": "Sends a Telegram notification message. Use ONLY when the user explicitly asks to send a Telegram alert or notification."
-      },
-      "type": "n8n-nodes-base.telegramTool",
-      "typeVersion": 1.2,
-      "position": [700, 620],
-      "id": "telegram-tool-v3",
-      "name": "Send Telegram",
+      "parameters": { "updates": { "poll": true } },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [-200, 500],
+      "id": "tg-trigger",
+      "name": "Telegram Trigger",
       "credentials": {
         "telegramApi": {
           "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
@@ -137,62 +41,169 @@
     },
     {
       "parameters": {
-        "jsCode": "const agentOutput = $input.first().json;\nconst reply = agentOutput.output || agentOutput.text || 'Yanıt üretilirken bir sorun oluştu.';\n\nreturn [{\n  json: {\n    output: reply,\n    source: 'n8n-ai-agent',\n    model: 'llama-3.3-70b-versatile',\n    timestamp: new Date().toISOString()\n  }\n}];"
+        "jsCode": "const msg = $input.first().json.message || {};\nreturn [{ json: { userMessage: msg.text || '', source: 'telegram', chatId: String(msg.chat?.id || ''), sessionId: 'tg-' + (msg.chat?.id || '') } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [540, 400],
-      "id": "format-response-v3",
+      "position": [0, 500],
+      "id": "prep-telegram",
+      "name": "Prep Telegram"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "Sen SkyOps AI Assistant'sın — kurumsal IoT RPL mesh ağ izleme ve otonom yönetim platformunun yapay zeka asistanısın.\n\n## SİSTEM MİMARİSİ\nn8n workflow orchestration üzerine kurulmuş Multi-Agent AI Automation sistemi:\n\n### Multi-Agent Pipeline (entegre)\nSen aynı zamanda 3 uzman agent'ın birleşimisin:\n- **Agent 1 (Detector):** Anomali tespiti ve sınıflandırma (NODE_FAILURE, ROUTING_FAIL, LATENCY_SPIKE, TOPOLOGY_CHANGE)\n- **Agent 2 (Root Cause Analyzer):** Kök neden analizi, temporal pattern, impact scope (SINGLE_NODE/MULTI_NODE/NETWORK_WIDE)\n- **Agent 3 (Action Advisor):** Aksiyon önerisi, recovery tahmini, preventive measures\n\n### Escalation Mantığı\n- Confidence >= 0.85: 🤖 AUTONOMOUS (otomatik aksiyon)\n- 0.50-0.84: 👤 HUMAN REVIEW (insan onayı gerekli)\n- < 0.50: 🚨 ESCALATED (üst düzey mühendise bildir)\n\n### Self-Healing Engine\nAnomali tipine göre otomatik iyileştirme:\n- NODE_FAILURE: Soft restart, traffic rerouting\n- ROUTING_FAILURE: Route re-probe, RPL local repair\n- TOPOLOGY_CHANGE: Parent switch logging, trend analysis\n\n## ARAÇLARIN\n- **Google Sheets (SkyOps Alert):** Tüm alert logları — anomali, severity, confidence, escalation, healing action\n- **Google Sheets (Summaries):** Günlük istatistik ve trendler\n- **Telegram:** Kullanıcı isterse bildirim gönder\n\n## GÖREVLERİN\n1. Ağ durumunu Sheets verilerine dayanarak analiz et\n2. Kullanıcı anomali analizi isterse → 3 agent rolünü uygula (Detect → Root Cause → Action)\n3. Self-healing kararlarını açıkla\n4. Trend analizi ve raporlama yap\n5. Sistemi ve mimarisini açıkla\n\n## KURALLAR\n- Türkçe yanıt ver\n- Teknik ama anlaşılır ol\n- Kısa ve net (max 3-4 paragraf)\n- Emoji kullan ama abartma\n- Google Sheets tool'larını kullanarak GERÇEK verilere dayalı yanıt ver\n- Tahmin yapma, verilere bak"
+        },
+        "promptType": "define",
+        "text": "={{ $json.userMessage }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [300, 350],
+      "id": "ai-agent",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": { "temperature": 0.7, "maxTokensToSample": 800 }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [140, 600],
+      "id": "groq-model",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": { "id": "YOUR_GROQ_CREDENTIAL_ID", "name": "Groq account" }
+      }
+    },
+    {
+      "parameters": { "sessionKey": "sessionId", "contextWindowLength": 10 },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [300, 600],
+      "id": "memory",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": { "__rl": true, "value": "178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "SkyOps Alert", "mode": "list" },
+        "options": {},
+        "toolDescription": "Reads network alert logs: Timestamp, Node, Severity, Anomaly, Confidence, Escalation, Healing Action. Use when user asks about alerts, anomalies, node health, or network status."
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.5,
+      "position": [440, 600],
+      "id": "sheets-alerts",
+      "name": "Read Alert Log",
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "YOUR_GOOGLE_CREDENTIAL_ID", "name": "Google Sheets account" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": { "__rl": true, "value": "178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Summaries", "mode": "list" },
+        "options": {},
+        "toolDescription": "Reads daily summary reports: period, total alerts, avg confidence, most critical node, autonomous actions, network health. Use for trends and statistics."
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.5,
+      "position": [580, 600],
+      "id": "sheets-summary",
+      "name": "Read Summaries",
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "YOUR_GOOGLE_CREDENTIAL_ID", "name": "Google Sheets account" }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "7771806225",
+        "text": "={{ $fromAI('message', 'Alert message to send') }}",
+        "additionalFields": {},
+        "toolDescription": "Sends a Telegram alert notification to the admin. Use ONLY when user explicitly asks to send an alert or notification."
+      },
+      "type": "n8n-nodes-base.telegramTool",
+      "typeVersion": 1.2,
+      "position": [720, 600],
+      "id": "tg-send",
+      "name": "Send Telegram Alert",
+      "credentials": {
+        "telegramApi": { "id": "YOUR_TELEGRAM_CREDENTIAL_ID", "name": "Telegram account" }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 },
+          "conditions": [{
+            "id": "route-check",
+            "leftValue": "={{ $('Prep Dashboard').first().json.source }}",
+            "rightValue": "dashboard",
+            "operator": { "type": "string", "operation": "equals" }
+          }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [540, 350],
+      "id": "route-output",
+      "name": "Route Output"
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = $input.first().json;\nreturn [{ json: { output: out.output || out.text || 'Yanıt üretilirken sorun oluştu.', source: 'n8n-ai-agent', model: 'llama-3.3-70b-versatile', timestamp: new Date().toISOString() } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 280],
+      "id": "format-dashboard",
       "name": "Format Response"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Prep Telegram').first().json.chatId }}",
+        "text": "={{ $json.output || $json.text || 'Bir hata oluştu.' }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [760, 420],
+      "id": "tg-reply",
+      "name": "Reply Telegram",
+      "credentials": {
+        "telegramApi": { "id": "YOUR_TELEGRAM_CREDENTIAL_ID", "name": "Telegram account" }
+      }
     }
   ],
   "pinData": {},
   "connections": {
-    "Chat Webhook": {
+    "Chat Webhook": { "main": [[{ "node": "Prep Dashboard", "type": "main", "index": 0 }]] },
+    "Prep Dashboard": { "main": [[{ "node": "AI Agent", "type": "main", "index": 0 }]] },
+    "Telegram Trigger": { "main": [[{ "node": "Prep Telegram", "type": "main", "index": 0 }]] },
+    "Prep Telegram": { "main": [[{ "node": "AI Agent", "type": "main", "index": 0 }]] },
+    "AI Agent": { "main": [[{ "node": "Route Output", "type": "main", "index": 0 }]] },
+    "Groq Chat Model": { "ai_languageModel": [[{ "node": "AI Agent", "type": "ai_languageModel", "index": 0 }]] },
+    "Simple Memory": { "ai_memory": [[{ "node": "AI Agent", "type": "ai_memory", "index": 0 }]] },
+    "Read Alert Log": { "ai_tool": [[{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]] },
+    "Read Summaries": { "ai_tool": [[{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]] },
+    "Send Telegram Alert": { "ai_tool": [[{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]] },
+    "Route Output": {
       "main": [
-        [{ "node": "AI Agent", "type": "main", "index": 0 }]
-      ]
-    },
-    "AI Agent": {
-      "main": [
-        [{ "node": "Format Response", "type": "main", "index": 0 }]
-      ]
-    },
-    "Groq Chat Model": {
-      "ai_languageModel": [
-        [{ "node": "AI Agent", "type": "ai_languageModel", "index": 0 }]
-      ]
-    },
-    "Simple Memory": {
-      "ai_memory": [
-        [{ "node": "AI Agent", "type": "ai_memory", "index": 0 }]
-      ]
-    },
-    "Read Alert Log": {
-      "ai_tool": [
-        [{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]
-      ]
-    },
-    "Read Summaries": {
-      "ai_tool": [
-        [{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]
-      ]
-    },
-    "Send Telegram": {
-      "ai_tool": [
-        [{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]
+        [{ "node": "Format Response", "type": "main", "index": 0 }],
+        [{ "node": "Reply Telegram", "type": "main", "index": 0 }]
       ]
     }
   },
   "active": false,
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "versionId": "ai-assistant-v3-agent",
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "skyops-ai-assistant-v3"
-  },
-  "id": "SkyOpsAIAssistantV3",
+  "settings": { "executionOrder": "v1" },
+  "versionId": "combined-v1",
+  "meta": { "templateCredsSetupCompleted": true, "instanceId": "skyops-combined" },
+  "id": "SkyOpsCombined",
   "tags": []
 }
