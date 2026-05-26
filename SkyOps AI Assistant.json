@@ -8,15 +8,31 @@
     },
     {
       "parameters": {
-        "url": "https://docs.google.com/spreadsheets/d/178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA/gviz/tq?tqx=out:json&sheet=SkyOps%20Alert",
-        "options": { "response": { "response": { "neverError": true } } }
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "SkyOps Alert",
+          "mode": "list"
+        },
+        "options": {}
       },
-      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [0, 200],
-      "id": "fetch-sheets", "name": "Fetch Sheets Data"
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.5, "position": [0, 200],
+      "id": "fetch-sheets", "name": "Fetch Sheets Data",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
     },
     {
       "parameters": {
-        "jsCode": "// Parse Google Sheets gviz response\nconst raw = $input.first().json.data || $input.first().json.body || '';\nconst rawStr = typeof raw === 'string' ? raw : JSON.stringify(raw);\nlet alerts = [];\ntry {\n  const match = rawStr.match(/google\\.visualization\\.Query\\.setResponse\\(([\\s\\S]*?)\\);/);\n  if (match) {\n    const json = JSON.parse(match[1]);\n    const cols = json.table.cols.map(c => c.label);\n    alerts = json.table.rows.map(row => {\n      const obj = {};\n      row.c.forEach((cell, i) => { obj[cols[i]] = cell ? (cell.v || cell.f || '') : ''; });\n      return obj;\n    }).filter(a => a.Timestamp);\n  }\n} catch(e) {}\n\nconst total = alerts.length;\nconst anomalies = alerts.filter(a => a.Anomaly && a.Anomaly !== 'NORMAL');\nconst critical = anomalies.filter(a => a.Severity === 'CRITICAL').length;\nconst high = anomalies.filter(a => a.Severity === 'HIGH').length;\nconst medium = anomalies.filter(a => a.Severity === 'MEDIUM').length;\nconst autonomous = alerts.filter(a => a.Escalation === 'AUTONOMOUS').length;\nconst humanReview = alerts.filter(a => a.Escalation === 'HUMAN_REVIEW').length;\nconst escalated = alerts.filter(a => a.Escalation === 'ESCALATED').length;\n\nconst nodeStats = {};\nalerts.forEach(a => {\n  const n = a.Node || 'Unknown';\n  if (!nodeStats[n]) nodeStats[n] = { total: 0, anomalies: 0, types: {} };\n  nodeStats[n].total++;\n  if (a.Anomaly && a.Anomaly !== 'NORMAL') {\n    nodeStats[n].anomalies++;\n    nodeStats[n].types[a.Anomaly] = (nodeStats[n].types[a.Anomaly] || 0) + 1;\n  }\n});\n\nconst nodeReport = Object.entries(nodeStats).map(([node, s]) =>\n  `${node}: ${s.total} olay, ${s.anomalies} anomali ${Object.entries(s.types).map(([t,c]) => `${t}(${c})`).join(', ')}`\n).join('\\n');\n\nconst recent = [...alerts].reverse().slice(0, 10).map(a =>\n  `[${a.Timestamp}] ${a.Node} | ${a.Anomaly} | ${a.Severity} | Güven:${a.Confidence} | ${a.Escalation} | ${a['Healing Action'] || '-'}`\n).join('\\n');\n\nconst webhookData = $('Chat Webhook').first().json.body || $('Chat Webhook').first().json;\nconst userMessage = webhookData.message || '';\nconst sessionId = webhookData.sessionId || 'dashboard';\n\nconst sheetsContext = `## GÜNCEL AĞ VERİLERİ (Google Sheets - ${new Date().toISOString()})\nToplam Olay: ${total} | Anomali: ${anomalies.length} | KRİTİK: ${critical} | YÜKSEK: ${high} | ORTA: ${medium}\nOtonom Aksiyon: ${autonomous} | İnsan Onayı: ${humanReview} | Eskalasyon: ${escalated}\n\n### Node Bazlı Durum:\n${nodeReport}\n\n### Son 10 Olay:\n${recent}`;\n\nreturn [{ json: { userMessage, sessionId, sheetsContext } }];"
+        "jsCode": "const alerts = $input.all().map(item => item.json).filter(a => a.Timestamp);\n\nconst total = alerts.length;\nconst anomalies = alerts.filter(a => a.Anomaly && a.Anomaly !== 'NORMAL');\nconst critical = anomalies.filter(a => a.Severity === 'CRITICAL').length;\nconst high = anomalies.filter(a => a.Severity === 'HIGH').length;\nconst medium = anomalies.filter(a => a.Severity === 'MEDIUM').length;\nconst autonomous = alerts.filter(a => a.Escalation === 'AUTONOMOUS').length;\nconst humanReview = alerts.filter(a => a.Escalation === 'HUMAN_REVIEW').length;\nconst escalated = alerts.filter(a => a.Escalation === 'ESCALATED').length;\n\nconst nodeStats = {};\nalerts.forEach(a => {\n  const n = a.Node || 'Unknown';\n  if (!nodeStats[n]) nodeStats[n] = { total: 0, anomalies: 0, types: {} };\n  nodeStats[n].total++;\n  if (a.Anomaly && a.Anomaly !== 'NORMAL') {\n    nodeStats[n].anomalies++;\n    nodeStats[n].types[a.Anomaly] = (nodeStats[n].types[a.Anomaly] || 0) + 1;\n  }\n});\n\nconst nodeReport = Object.entries(nodeStats).map(([node, s]) =>\n  `${node}: ${s.total} olay, ${s.anomalies} anomali ${Object.entries(s.types).map(([t,c]) => `${t}(${c})`).join(', ')}`\n).join('\\n');\n\nconst recent = [...alerts].reverse().slice(0, 10).map(a =>\n  `[${a.Timestamp}] ${a.Node} | ${a.Anomaly} | ${a.Severity} | Güven:${a.Confidence} | ${a.Escalation} | ${a['Healing Action'] || '-'}`\n).join('\\n');\n\nconst webhookData = $('Chat Webhook').first().json.body || $('Chat Webhook').first().json;\nconst userMessage = webhookData.message || '';\nconst sessionId = webhookData.sessionId || 'dashboard';\n\nconst sheetsContext = `## GÜNCEL AĞ VERİLERİ (Google Sheets - ${new Date().toISOString()})\\nToplam Olay: ${total} | Anomali: ${anomalies.length} | KRİTİK: ${critical} | YÜKSEK: ${high} | ORTA: ${medium}\\nOtonom Aksiyon: ${autonomous} | İnsan Onayı: ${humanReview} | Eskalasyon: ${escalated}\\n\\n### Node Bazlı Durum:\\n${nodeReport}\\n\\n### Son 10 Olay:\\n${recent}`;\n\nreturn [{ json: { userMessage, sessionId, sheetsContext } }];"
       },
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [220, 200],
       "id": "build-context", "name": "Build Context"
@@ -24,7 +40,7 @@
     {
       "parameters": {
         "options": {
-          "systemMessage": "={{ 'Sen SkyOps AI Assistant adlı bir yapay zeka ağ yönetim asistanısın. IoT RPL mesh ağlarını otonom olarak izliyor, analiz ediyor ve yönetiyorsun.\\n\\n## KESİN DİL KURALI\\nHer yanıtını YALNIZCA ve TAMAMEN TÜRKÇE olarak yaz. Hiçbir koşulda İngilizce, İspanyolca veya başka bir dilde kelime ya da cümle kullanma. Teknik terimler dahil her şeyi Türkçe yaz. Ancak node isimleri (Node #1, Node #2...) ve anomali türleri (NODE_FAILURE, ROUTING_FAILURE, LATENCY_SPIKE, TOPOLOGY_CHANGE, PACKET_LOSS) olduğu gibi kalabilir çünkü bunlar sistemdeki resmi tanımlayıcılardır.\\n\\n' + $json.sheetsContext + '\\n\\n## SİSTEM MİMARİSİ\\nn8n iş akışı orkestrasyon üzerine kurulmuş Çoklu Ajan Yapay Zeka Otomasyon sistemi.\\n\\n### Çoklu Ajan Yapısı\\nSen 3 uzman ajanın birleşimisin:\\n- Ajan 1 (Tespit): Anomali tespiti ve sınıflandırma\\n- Ajan 2 (Kök Neden): Kök neden analizi, zamansal örüntü, etki alanı\\n- Ajan 3 (Aksiyon): Kurtarma önerisi, önleyici tedbirler, toparlanma süresi tahmini\\n\\n### Eskalasyon Mantığı\\n- Güven skoru >= 0.85: 🤖 OTONOM — sistem otomatik aksiyon alır\\n- 0.50-0.84: 👤 İNSAN ONAYI — operatör incelemesi beklenir\\n- < 0.50: 🚨 ESKALASYoN — kıdemli ağ mühendisine yönlendirilir\\n\\n### Kendini İyileştirme Motoru\\n- NODE_FAILURE → Yumuşak yeniden başlatma + trafik yeniden yönlendirme\\n- ROUTING_FAILURE → Rota yeniden araştırma + RPL yerel onarım\\n- LATENCY_SPIKE → QoS ayarlama + kuyruk yönetimi optimizasyonu\\n- TOPOLOGY_CHANGE → Ebeveyn düğüm değişikliği kaydı ve izleme\\n- PACKET_LOSS → Hız sınırlama + paket kaybı düzeltme mekanizması\\n\\n## YANIT FORMAT KURALLARI\\n1. YALNIZCA Türkçe yaz — İngilizce veya başka bir dil kesinlikle YASAK\\n2. Yanıtını madde madde yapılandır — her node için ayrı analiz yap\\n3. Her anomali için güven skoru ve eskalasyon seviyesini belirt\\n4. Kısa ve öz ol, en fazla 3-4 paragraf\\n5. Yukarıdaki GÜNCEL AĞ VERİLERİNE dayanarak cevap ver, tahmin yapma\\n6. Emoji kullan ama abartma\\n7. Aksiyon sorulursa her node için somut adımlar belirt' }}"
+          "systemMessage": "={{ 'Sen SkyOps AI Assistant adlı bir yapay zeka ağ yönetim asistanısın. IoT RPL mesh ağlarını otonom olarak izliyor, analiz ediyor ve yönetiyorsun.\\n\\n## ARAÇ KULLANIMI (Google Sheets Tool)\\nTablo üzerinde okuma, ekleme (append), güncelleme (update) ve satır silme yetkilerine sahipsin! Kullanıcı yeni alert/olay eklemek, mevcut olayı güncellemek veya silmek gibi bir komut verdiğinde ilgili aracı (Google Sheets Tool) doğrudan kullanabilirsin.\\n\\n## KESİN DİL KURALI\\nHer yanıtını YALNIZCA ve TAMAMEN TÜRKÇE olarak yaz. Hiçbir koşulda İngilizce, İspanyolca veya başka bir dilde kelime ya da cümle kullanma. Teknik terimler dahil her şeyi Türkçe yaz. Ancak node isimleri (Node #1, Node #2...) ve anomali türleri (NODE_FAILURE, ROUTING_FAILURE, LATENCY_SPIKE, TOPOLOGY_CHANGE, PACKET_LOSS) olduğu gibi kalabilir çünkü bunlar sistemdeki resmi tanımlayıcılardır.\\n\\n' + $json.sheetsContext + '\\n\\n## SİSTEM MİMARİSİ\\nn8n iş akışı orkestrasyon üzerine kurulmuş Çoklu Ajan Yapay Zeka Otomasyon sistemi.\\n\\n### Çoklu Ajan Yapısı\\nSen 3 uzman ajanın birleşimisin:\\n- Ajan 1 (Tespit): Anomali tespiti ve sınıflandırma\\n- Ajan 2 (Kök Neden): Kök neden analizi, zamansal örüntü, etki alanı\\n- Ajan 3 (Aksiyon): Kurtarma önerisi, önleyici tedbirler, toparlanma süresi tahmini\\n\\n### Eskalasyon Mantığı\\n- Güven skoru >= 0.85: 🤖 OTONOM — sistem otomatik aksiyon alır\\n- 0.50-0.84: 👤 İNSAN ONAYI — operatör incelemesi beklenir\\n- < 0.50: 🚨 ESKALASYoN — kıdemli ağ mühendisine yönlendirilir\\n\\n### Kendini İyileştirme Motoru\\n- NODE_FAILURE → Yumuşak yeniden başlatma + trafik yeniden yönlendirme\\n- ROUTING_FAILURE → Rota yeniden araştırma + RPL yerel onarım\\n- LATENCY_SPIKE → QoS ayarlama + kuyruk yönetimi optimizasyonu\\n- TOPOLOGY_CHANGE → Ebeveyn düğüm değişikliği kaydı ve izleme\\n- PACKET_LOSS → Hız sınırlama + paket kaybı düzeltme mekanizması\\n\\n## YANIT FORMAT KURALLARI\\n1. YALNIZCA Türkçe yaz — İngilizce veya başka bir dil kesinlikle YASAK\\n2. Yanıtını madde madde yapılandır — her node için ayrı analiz yap\\n3. Her anomali için güven skoru ve eskalasyon seviyesini belirt\\n4. Kısa ve öz ol, en fazla 3-4 paragraf\\n5. Yukarıdaki GÜNCEL AĞ VERİLERİNE dayanarak cevap ver, tahmin yapma\\n6. Emoji kullan ama abartma\\n7. Aksiyon sorulursa her node için somut adımlar belirt' }}"
         },
         "promptType": "define",
         "text": "={{ $json.userMessage }}"
@@ -59,15 +75,31 @@
     },
     {
       "parameters": {
-        "url": "https://docs.google.com/spreadsheets/d/178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA/gviz/tq?tqx=out:json&sheet=SkyOps%20Alert",
-        "options": { "response": { "response": { "neverError": true } } }
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "SkyOps Alert",
+          "mode": "list"
+        },
+        "options": {}
       },
-      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [0, 600],
-      "id": "fetch-sheets-tg", "name": "Fetch Sheets TG"
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.5, "position": [0, 600],
+      "id": "fetch-sheets-tg", "name": "Fetch Sheets TG",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
     },
     {
       "parameters": {
-        "jsCode": "const raw = $input.first().json.data || $input.first().json.body || '';\nconst rawStr = typeof raw === 'string' ? raw : JSON.stringify(raw);\nlet alerts = [];\ntry {\n  const match = rawStr.match(/google\\.visualization\\.Query\\.setResponse\\(([\\s\\S]*?)\\);/);\n  if (match) {\n    const json = JSON.parse(match[1]);\n    const cols = json.table.cols.map(c => c.label);\n    alerts = json.table.rows.map(row => {\n      const obj = {};\n      row.c.forEach((cell, i) => { obj[cols[i]] = cell ? (cell.v || cell.f || '') : ''; });\n      return obj;\n    }).filter(a => a.Timestamp);\n  }\n} catch(e) {}\n\nconst total = alerts.length;\nconst anomalies = alerts.filter(a => a.Anomaly && a.Anomaly !== 'NORMAL');\nconst critical = anomalies.filter(a => a.Severity === 'CRITICAL').length;\nconst autonomous = alerts.filter(a => a.Escalation === 'AUTONOMOUS').length;\n\nconst nodeStats = {};\nalerts.forEach(a => {\n  const n = a.Node || 'Unknown';\n  if (!nodeStats[n]) nodeStats[n] = { total: 0, anomalies: 0 };\n  nodeStats[n].total++;\n  if (a.Anomaly && a.Anomaly !== 'NORMAL') nodeStats[n].anomalies++;\n});\nconst nodeReport = Object.entries(nodeStats).map(([n, s]) => `${n}: ${s.total} olay, ${s.anomalies} anomali`).join('\\n');\n\nconst recent = [...alerts].reverse().slice(0, 5).map(a =>\n  `[${String(a.Timestamp).substring(11,19)}] ${a.Node} | ${a.Anomaly} | ${a.Severity} | ${a.Escalation}`\n).join('\\n');\n\nconst tgMsg = $('Telegram Trigger').first().json.message || {};\nconst userMessage = tgMsg.text || '';\nconst chatId = String(tgMsg.chat?.id || '');\n\nconst sheetsContext = `## AĞ VERİLERİ\\nToplam: ${total} | Anomali: ${anomalies.length} | KRİTİK: ${critical} | Otonom: ${autonomous}\\n\\n${nodeReport}\\n\\nSon 5 Olay:\\n${recent}`;\n\nreturn [{ json: { userMessage, chatId, sessionId: chatId, sheetsContext } }];"
+        "jsCode": "const alerts = $input.all().map(item => item.json).filter(a => a.Timestamp);\n\nconst total = alerts.length;\nconst anomalies = alerts.filter(a => a.Anomaly && a.Anomaly !== 'NORMAL');\nconst critical = anomalies.filter(a => a.Severity === 'CRITICAL').length;\nconst autonomous = alerts.filter(a => a.Escalation === 'AUTONOMOUS').length;\n\nconst nodeStats = {};\nalerts.forEach(a => {\n  const n = a.Node || 'Unknown';\n  if (!nodeStats[n]) nodeStats[n] = { total: 0, anomalies: 0 };\n  nodeStats[n].total++;\n  if (a.Anomaly && a.Anomaly !== 'NORMAL') nodeStats[n].anomalies++;\n});\nconst nodeReport = Object.entries(nodeStats).map(([n, s]) => `${n}: ${s.total} olay, ${s.anomalies} anomali`).join('\\n');\n\nconst recent = [...alerts].reverse().slice(0, 5).map(a =>\n  `[${String(a.Timestamp).substring(11,19)}] ${a.Node} | ${a.Anomaly} | ${a.Severity} | ${a.Escalation}`\n).join('\\n');\n\nconst tgMsg = $('Telegram Trigger').first().json.message || {};\nconst userMessage = tgMsg.text || '';\nconst chatId = String(tgMsg.chat?.id || '');\n\nconst sheetsContext = `## AĞ VERİLERİ\\nToplam: ${total} | Anomali: ${anomalies.length} | KRİTİK: ${critical} | Otonom: ${autonomous}\\n\\n${nodeReport}\\n\\nSon 5 Olay:\\n${recent}`;\n\nreturn [{ json: { userMessage, chatId, sessionId: chatId, sheetsContext } }];"
       },
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [220, 600],
       "id": "build-context-tg", "name": "Build Context TG"
@@ -75,7 +107,7 @@
     {
       "parameters": {
         "options": {
-          "systemMessage": "={{ 'Sen SkyOps AI Assistant adlı bir yapay zeka ağ yönetim asistanısın. Telegram üzerinden konuşuyorsun.\\n\\nKESİN KURAL: Tüm yanıtlarını YALNIZCA TÜRKÇE yaz. Başka dilde tek bir kelime bile kullanma. Node isimleri ve anomali türleri hariç her şey Türkçe olmalıdır.\\n\\n' + $json.sheetsContext + '\\n\\n## YETENEKLERİN\\n- Ağ durumunu gerçek zamanlı analiz et\\n- 3 Ajan rolü: Tespit → Kök Neden → Aksiyon Danışmanı\\n- Eskalasyon: >=0.85 OTONOM, 0.50-0.84 İNSAN ONAYI, <0.50 ESKALASYoN\\n\\n## KURALLAR\\n- YALNIZCA Türkçe yaz\\n- Kısa, net ve yapılandırılmış cevap ver\\n- Verilere dayalı cevap ver, tahmin yapma\\n- Emoji kullan ama abartma' }}"
+          "systemMessage": "={{ 'Sen SkyOps AI Assistant adlı bir yapay zeka ağ yönetim asistanısın. Telegram üzerinden konuşuyorsun.\\n\\n## ARAÇ KULLANIMI (Google Sheets Tool)\\nTablo üzerinde okuma, ekleme (append), güncelleme (update) ve satır silme yetkilerine sahipsin! Kullanıcı yeni alert/olay eklemek, mevcut olayı güncellemek veya silmek gibi bir komut verdiğinde ilgili aracı (Google Sheets Tool) doğrudan kullanabilirsin.\\n\\nKESİN KURAL: Tüm yanıtlarını YALNIZCA TÜRKÇE yaz. Başka dilde tek bir kelime bile kullanma. Node isimleri ve anomali türleri hariç her şey Türkçe olmalıdır.\\n\\n' + $json.sheetsContext + '\\n\\n## YETENEKLERİN\\n- Ağ durumunu gerçek zamanlı analiz et\\n- 3 Ajan rolü: Tespit → Kök Neden → Aksiyon Danışmanı\\n- Eskalasyon: >=0.85 OTONOM, 0.50-0.84 İNSAN ONAYI, <0.50 ESKALASYoN\\n\\n## KURALLAR\\n- YALNIZCA Türkçe yaz\\n- Kısa, net ve yapılandırılmış cevap ver\\n- Verilere dayalı cevap ver, tahmin yapma\\n- Emoji kullan ama abartma' }}"
         },
         "promptType": "define",
         "text": "={{ $json.userMessage }}"
@@ -114,15 +146,31 @@
     },
     {
       "parameters": {
-        "url": "https://docs.google.com/spreadsheets/d/178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA/gviz/tq?tqx=out:json&sheet=SkyOps%20Alert",
-        "options": { "response": { "response": { "neverError": true } } }
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "SkyOps Alert",
+          "mode": "list"
+        },
+        "options": {}
       },
-      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [0, 1050],
-      "id": "fetch-daily", "name": "Fetch Daily Data"
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.5, "position": [0, 1050],
+      "id": "fetch-daily", "name": "Fetch Daily Data",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
     },
     {
       "parameters": {
-        "jsCode": "const raw = $input.first().json.data || $input.first().json.body || '';\nconst rawStr = typeof raw === 'string' ? raw : JSON.stringify(raw);\nlet alerts = [];\ntry {\n  const match = rawStr.match(/google\\.visualization\\.Query\\.setResponse\\(([\\s\\S]*?)\\);/);\n  if (match) {\n    const json = JSON.parse(match[1]);\n    const cols = json.table.cols.map(c => c.label);\n    alerts = json.table.rows.map(row => {\n      const obj = {};\n      row.c.forEach((cell, i) => { obj[cols[i]] = cell ? (cell.v || cell.f || '') : ''; });\n      return obj;\n    }).filter(a => a.Timestamp);\n  }\n} catch(e) {}\n\n// Aggregate stats\nconst total = alerts.length;\nconst anomalies = alerts.filter(a => a.Anomaly && a.Anomaly !== 'NORMAL');\nconst byType = {};\nanomalies.forEach(a => { byType[a.Anomaly] = (byType[a.Anomaly] || 0) + 1; });\nconst bySeverity = {};\nanomalies.forEach(a => { bySeverity[a.Severity] = (bySeverity[a.Severity] || 0) + 1; });\nconst byNode = {};\nalerts.forEach(a => {\n  const n = a.Node || 'Unknown';\n  if (!byNode[n]) byNode[n] = { total: 0, anomalies: 0 };\n  byNode[n].total++;\n  if (a.Anomaly && a.Anomaly !== 'NORMAL') byNode[n].anomalies++;\n});\nconst autonomous = alerts.filter(a => a.Escalation === 'AUTONOMOUS').length;\nconst humanReview = alerts.filter(a => a.Escalation === 'HUMAN_REVIEW').length;\nconst escalated = alerts.filter(a => a.Escalation === 'ESCALATED').length;\n\n// Most problematic node\nconst worstNode = Object.entries(byNode).sort((a,b) => b[1].anomalies - a[1].anomalies)[0];\n\n// Network health score\nconst healthPct = total > 0 ? Math.round(((total - anomalies.length) / total) * 100) : 100;\n\nconst now = new Date();\nconst dateStr = now.toISOString().split('T')[0];\n\nconst typeReport = Object.entries(byType).map(([t,c]) => `  • ${t}: ${c}`).join('\\n');\nconst sevReport = Object.entries(bySeverity).map(([s,c]) => `  • ${s}: ${c}`).join('\\n');\nconst nodeReport = Object.entries(byNode).map(([n,s]) => `  • ${n}: ${s.total} olay, ${s.anomalies} anomali`).join('\\n');\n\nconst summaryText = `📊 SkyOps Günlük Rapor — ${dateStr}\\n\\n🔢 Toplam Olay: ${total}\\n⚠️ Anomali: ${anomalies.length} (${total > 0 ? Math.round((anomalies.length/total)*100) : 0}%)\\n🏥 Ağ Sağlık Skoru: ${healthPct}%\\n\\n📋 Anomali Türleri:\\n${typeReport || '  • Yok'}\\n\\n🎯 Ciddiyet Dağılımı:\\n${sevReport || '  • Yok'}\\n\\n🖥️ Node Bazlı:\\n${nodeReport}\\n\\n🤖 Eskalasyon Dağılımı:\\n  • Otonom: ${autonomous}\\n  • İnsan Onayı: ${humanReview}\\n  • Eskalasyon: ${escalated}\\n\\n${worstNode ? `⚠️ En sorunlu düğüm: ${worstNode[0]} (${worstNode[1].anomalies} anomali)` : '✅ Tüm düğümler stabil'}\\n\\n🕐 Rapor zamanı: ${now.toISOString()}`;\n\n// Summary row for Google Sheets\nconst summaryRow = {\n  Timestamp: now.toISOString(),\n  Node: 'GÜNLÜK RAPOR',\n  Severity: healthPct >= 80 ? 'LOW' : healthPct >= 50 ? 'MEDIUM' : 'CRITICAL',\n  Anomaly: `DAILY_SUMMARY`,\n  Confidence: String(healthPct / 100),\n  Escalation: 'AUTONOMOUS',\n  'Healing Action': `Toplam: ${total}, Anomali: ${anomalies.length}, Sağlık: ${healthPct}%`,\n  'Root Cause': `En sorunlu: ${worstNode ? worstNode[0] : 'Yok'}`\n};\n\nreturn [{ json: { summaryText, summaryRow, dateStr } }];"
+        "jsCode": "const alerts = $input.all().map(item => item.json).filter(a => a.Timestamp);\n\n// Aggregate stats\nconst total = alerts.length;\nconst anomalies = alerts.filter(a => a.Anomaly && a.Anomaly !== 'NORMAL');\nconst byType = {};\nanomalies.forEach(a => { byType[a.Anomaly] = (byType[a.Anomaly] || 0) + 1; });\nconst bySeverity = {};\nanomalies.forEach(a => { bySeverity[a.Severity] = (bySeverity[a.Severity] || 0) + 1; });\nconst byNode = {};\nalerts.forEach(a => {\n  const n = a.Node || 'Unknown';\n  if (!byNode[n]) byNode[n] = { total: 0, anomalies: 0 };\n  byNode[n].total++;\n  if (a.Anomaly && a.Anomaly !== 'NORMAL') byNode[n].anomalies++;\n});\nconst autonomous = alerts.filter(a => a.Escalation === 'AUTONOMOUS').length;\nconst humanReview = alerts.filter(a => a.Escalation === 'HUMAN_REVIEW').length;\nconst escalated = alerts.filter(a => a.Escalation === 'ESCALATED').length;\n\n// Most problematic node\nconst worstNode = Object.entries(byNode).sort((a,b) => b[1].anomalies - a[1].anomalies)[0];\n\n// Network health score\nconst healthPct = total > 0 ? Math.round(((total - anomalies.length) / total) * 100) : 100;\n\nconst now = new Date();\nconst dateStr = now.toISOString().split('T')[0];\n\nconst typeReport = Object.entries(byType).map(([t,c]) => `  • ${t}: ${c}`).join('\\n');\nconst sevReport = Object.entries(bySeverity).map(([s,c]) => `  • ${s}: ${c}`).join('\\n');\nconst nodeReport = Object.entries(byNode).map(([n,s]) => `  • ${n}: ${s.total} olay, ${s.anomalies} anomali`).join('\\n');\n\nconst summaryText = `📊 SkyOps Günlük Rapor — ${dateStr}\\n\\n🔢 Toplam Olay: ${total}\\n⚠️ Anomali: ${anomalies.length} (${total > 0 ? Math.round((anomalies.length/total)*100) : 0}%)\\n🏥 Ağ Sağlık Skoru: ${healthPct}%\\n\\n📋 Anomali Türleri:\\n${typeReport || '  • Yok'}\\n\\n🎯 Ciddiyet Dağılımı:\\n${sevReport || '  • Yok'}\\n\\n🖥️ Node Bazlı:\\n${nodeReport}\\n\\n🤖 Eskalasyon Dağılımı:\\n  • Otonom: ${autonomous}\\n  • İnsan Onayı: ${humanReview}\\n  • Eskalasyon: ${escalated}\\n\\n${worstNode ? `⚠️ En sorunlu düğüm: ${worstNode[0]} (${worstNode[1].anomalies} anomali)` : '✅ Tüm düğümler stabil'}\\n\\n🕐 Rapor zamanı: ${now.toISOString()}`;\n\n// Summary row for Google Sheets\nconst summaryRow = {\n  Timestamp: now.toISOString(),\n  Node: 'GÜNLÜK RAPOR',\n  Severity: healthPct >= 80 ? 'LOW' : healthPct >= 50 ? 'MEDIUM' : 'CRITICAL',\n  Anomaly: `DAILY_SUMMARY`,\n  Confidence: String(healthPct / 100),\n  Escalation: 'AUTONOMOUS',\n  'Healing Action': `Toplam: ${total}, Anomali: ${anomalies.length}, Sağlık: ${healthPct}%`,\n  'Root Cause': `En sorunlu: ${worstNode ? worstNode[0] : 'Yok'}`\n};\n\nreturn [{ json: { summaryText, summaryRow, dateStr } }];"
       },
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [220, 1050],
       "id": "aggregate-daily", "name": "Aggregate Stats"
@@ -173,6 +221,29 @@
       "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [700, 1050],
       "id": "tg-daily", "name": "Send Daily Report",
       "credentials": { "telegramApi": { "id": "YOUR_TELEGRAM_CREDENTIAL_ID", "name": "Telegram account" } }
+    },
+
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "SkyOps Alert",
+          "mode": "list"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheetsTool", "typeVersion": 4.5, "position": [280, 10],
+      "id": "google-sheets-tool", "name": "Google Sheets Tool",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -183,6 +254,14 @@
     "AI Agent": { "main": [[{ "node": "Format Response", "type": "main", "index": 0 }]] },
     "Groq Chat Model": { "ai_languageModel": [[{ "node": "AI Agent", "type": "ai_languageModel", "index": 0 }]] },
     "Simple Memory": { "ai_memory": [[{ "node": "AI Agent", "type": "ai_memory", "index": 0 }]] },
+    "Google Sheets Tool": {
+      "ai_tool": [
+        [
+          { "node": "AI Agent", "type": "ai_tool", "index": 0 },
+          { "node": "Telegram AI Agent", "type": "ai_tool", "index": 0 }
+        ]
+      ]
+    },
 
     "Telegram Trigger": { "main": [[{ "node": "Fetch Sheets TG", "type": "main", "index": 0 }]] },
     "Fetch Sheets TG": { "main": [[{ "node": "Build Context TG", "type": "main", "index": 0 }]] },
@@ -198,8 +277,8 @@
   },
   "active": false,
   "settings": { "executionOrder": "v1" },
-  "versionId": "v6-unified",
-  "meta": { "templateCredsSetupCompleted": true, "instanceId": "skyops-v6" },
-  "id": "SkyOpsV6",
+  "versionId": "v7-unified",
+  "meta": { "templateCredsSetupCompleted": true, "instanceId": "skyops-v7" },
+  "id": "SkyOpsV7",
   "tags": []
 }

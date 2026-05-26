@@ -52,8 +52,8 @@ SkyOps Agent is an **autonomous network operations (NetOps) AI system** that tra
 │  │ Google Sheets │───▶│     n8n Cloud Workflow        │           │
 │  │ (Telemetry)   │    │                                │           │
 │  └──────────────┘    │  ┌──────────┐  ┌───────────┐  │           │
-│                       │  │  HTTP     │  │  Build    │  │           │
-│                       │  │  Fetch    │─▶│  Context  │  │           │
+│                       │  │ GSheets  │  │  Build    │  │           │
+│                       │  │ Read     │─▶│  Context  │  │           │
 │                       │  └──────────┘  └─────┬─────┘  │           │
 │                       │                       │        │           │
 │                       │              ┌────────▼──────┐ │           │
@@ -104,12 +104,17 @@ Unlike traditional multi-workflow approaches, SkyOps uses a **single unified AI 
 ### How It Works
 
 ```
-User Question → Fetch Google Sheets Data → Build Context → AI Agent → Response
-                    (HTTP Request)          (Code Node)    (Groq LLM)
+User Question ──▶ Build Context ──▶ AI Agent ──▶ Response
+                       ▲               │
+                       │               │ (Google Sheets Tool)
+                       │               ▼
+                Fetch Sheets Data ◀───[Reads/Writes/Deletes]
+                  (GSheets Node)
 ```
 
-1. **Real Data Injection**: Every query triggers a fresh Google Sheets fetch (100+ alert records)
-2. **Context Building**: Raw data is parsed into structured network statistics and recent events
+1. **Direct Google Sheets Integration**: Every query reads fresh Google Sheets data natively via n8n's Google Sheets node.
+2. **AI-Agent Tool Action**: The AI Agent is equipped with a `Google Sheets Tool` connected directly to its LangChain engine. If a user asks to add, edit, or delete events, the Agent can dynamically call the tool to execute these actions on the sheet in real-time.
+3. **Context Building**: Raw data is parsed into structured network statistics and recent events
 3. **AI Agent**: Llama-3.3-70B analyzes with all 3 agent roles embedded in the system prompt
 4. **Response**: Formatted, actionable analysis delivered to Dashboard or Telegram
 
@@ -174,7 +179,7 @@ cd SkyOps-Agent
    - **Telegram Bot** → Reply to User node
 4. Click **Publish** to activate
 
-> **Note:** Google Sheets data is fetched via public HTTP — no Google credentials needed.
+> **Note:** Google Sheets data is accessed and modified securely using your Google credentials.
 
 ---
 
