@@ -813,7 +813,7 @@ function initChat() {
     history.replaceState(null, '', window.location.pathname);
   }
   const GROQ_API_KEY = localStorage.getItem('skyops_groq_key') || '';
-  const N8N_WEBHOOK_URL = localStorage.getItem('skyops_n8n_url') || '';
+  const N8N_WEBHOOK_URL = localStorage.getItem('skyops_n8n_url') || 'https://omerpanaymsku.app.n8n.cloud/webhook/skyops-chat';
   const GOOGLE_SHEET_ID = '178rQWaShDZzy5ZdQwhwZeCfNkWFyCSEAx9IWkpWYRaA';
   const SHEET_TAB = 'SkyOps Alert';
 
