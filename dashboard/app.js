@@ -547,8 +547,7 @@ function initPipelinePanel() {
 
   let allAlerts = [];
   let displayedCount = 0;
-  const BATCH_SIZE = 3;
-  const BATCH_INTERVAL = 800; // ms between each batch
+  const BATCH_SIZE = 1; // Single event at a time — realistic RPL mesh behavior
 
   async function fetchPipelineData() {
     try {
@@ -617,7 +616,9 @@ function initPipelinePanel() {
     }
 
     displayedCount = end;
-    setTimeout(progressiveLoad, BATCH_INTERVAL);
+    // Randomized 2-5s interval — mimics real RPL mesh DIO/DAO/sensor timing
+    const nextInterval = 2000 + Math.random() * 3000;
+    setTimeout(progressiveLoad, nextInterval);
   }
 
   // === PIPELINE DATA PANEL ===
