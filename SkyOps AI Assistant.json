@@ -17,7 +17,7 @@
         "sheetName": {
           "__rl": true,
           "value": "SkyOps Alert",
-          "mode": "list"
+          "mode": "name"
         },
         "options": {}
       },
@@ -84,7 +84,7 @@
         "sheetName": {
           "__rl": true,
           "value": "SkyOps Alert",
-          "mode": "list"
+          "mode": "name"
         },
         "options": {}
       },
@@ -155,7 +155,7 @@
         "sheetName": {
           "__rl": true,
           "value": "SkyOps Alert",
-          "mode": "list"
+          "mode": "name"
         },
         "options": {}
       },
@@ -186,7 +186,7 @@
         "sheetName": {
           "__rl": true,
           "value": "SkyOps Alert",
-          "mode": "list"
+          "mode": "name"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -233,7 +233,7 @@
         "sheetName": {
           "__rl": true,
           "value": "SkyOps Alert",
-          "mode": "list"
+          "mode": "name"
         }
       },
       "type": "n8n-nodes-base.googleSheetsTool", "typeVersion": 4.5, "position": [280, 10],
