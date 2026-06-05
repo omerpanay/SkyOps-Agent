@@ -14,7 +14,7 @@
 
 ---
 
-*An enterprise-grade AI system that autonomously monitors, diagnoses, and responds to anomalies in RPL-based IoT mesh networks — powered by a unified AI Agent with multi-agent reasoning, dual-entry access (Dashboard + Telegram), and real-time Cooja Simulation telemetry.*
+*An enterprise-grade AI system that autonomously monitors, diagnoses, and suggests response actions to anomalies in RPL-based IoT mesh networks — powered by a unified AI Agent with multi-agent reasoning, dual-entry access (Dashboard + Telegram), and real-time Cooja Simulation telemetry.*
 
 **[🚀 Live Dashboard](https://omerpanay.github.io/SkyOps-Agent/dashboard/)** · **[📱 Telegram Bot](https://t.me/SkyOpsAgent_bot)** · **[📋 Architecture](#architecture)** · **[⚡ Quick Start](#quick-start)**
 
@@ -34,8 +34,7 @@ SkyOps Agent is an **autonomous network operations (NetOps) AI system** that tra
 | 🌐 **Docker Proxy Bridge** | Secure host-to-container tunneling to stream serial logs without JVM port conflicts |
 | 📱 **Telegram Bot** | Same AI Agent accessible via [@SkyOpsAgent_bot](https://t.me/SkyOpsAgent_bot) |
 | 💬 **AI Chat Interface** | Conversational assistant powered by live network data fed directly into prompt contexts |
-| 🔧 **Self-Healing** | Autonomous recovery actions with confidence-based escalation |
-| 🛡️ **Guardrails** | Confidence scoring (0.0–1.0) with 3-tier escalation logic |
+| 🔧 **Action Advisor** | Recommended recovery actions and diagnostic steps for the human operator |
 | 📈 **Progressive Data Feed** | Events stream one-by-one with realistic 2-5s mesh timing |
 | 🔍 **Hybrid Detection** | Rule Engine (0ms) + Multi-Agent LLM for complex anomaly analysis |
 
@@ -117,14 +116,6 @@ User Question ──▶ Build Context ──▶ AI Agent ──▶ Response
 3. **AI Agent**: Llama-3.3-70B analyzes the context using the embedded 3-agent prompt roles.
 4. **Response**: Formatted, actionable analysis delivered to Dashboard or Telegram bot.
 
-### Escalation Logic
-
-| Confidence | Level | Action |
-|---|---|---|
-| **≥ 0.85** | 🤖 AUTONOMOUS | System takes action automatically |
-| **0.50 – 0.84** | 👤 HUMAN REVIEW | Alert sent for human review |
-| **< 0.50** | 🚨 ESCALATED | Immediate escalation to senior engineer |
-
 ---
 
 ## 📊 Dashboard Features
@@ -138,7 +129,7 @@ The dashboard is a **real-time web application** connected directly to the local
 | 📋 **Live Event Feed** | Progressive event stream parsed from Contiki-NG serial messages |
 | 🔔 **Alert History** | Detection alerts with severity badges, confidence scores, and detection methods |
 | 🤖 **Detection Split** | Donut chart showing Rule Engine vs LLM Agent distribution |
-| 🔧 **Self-Healing Actions** | Autonomous recovery actions with escalation indicators and live progress tracking |
+| 🔧 **Action Advisor Panel** | Recommended recovery actions and diagnostic indicators |
 | 📊 **Pipeline Status** | Real-time Bridge API connection status and statistics |
 | ⏱️ **Anomaly Timeline** | Horizontal timeline with color-coded event markers |
 | 💬 **AI Chat** | Rich-formatted conversational assistant with severity badges |
@@ -212,18 +203,18 @@ SkyOps-Agent/
 
 ---
 
-## 🔧 Self-Healing & Confidence Escalation
+## 🔧 Anomaly Advisor & Recommended Actions
 
-SkyOps doesn't just detect — it **acts**:
+SkyOps doesn't just detect — it **recommends recovery procedures** for the operator to execute:
 
-| Action | Trigger | Method |
+| Recommended Action | Trigger | Method |
 |---|---|---|
-| **Soft Restart** | NODE_FAILURE | RPL control plane restart |
-| **Traffic Rerouting** | NODE_FAILURE | Backup parent node selection |
-| **Route Re-probe** | ROUTING_FAILURE | DIO/DIS message injection |
-| **RPL Local Repair** | ROUTING_FAILURE | Local repair procedure |
-| **QoS Adjustment** | LATENCY_SPIKE | Queue management optimization |
-| **Parent Switch Log** | TOPOLOGY_CHANGE | Trend analysis + monitoring |
+| **Soft Restart** | NODE_FAILURE | Recommend RPL control plane restart |
+| **Traffic Rerouting** | NODE_FAILURE | Recommend backup parent node selection |
+| **Route Re-probe** | ROUTING_FAILURE | Recommend DIO/DIS message injection |
+| **RPL Local Repair** | ROUTING_FAILURE | Recommend local repair procedure |
+| **QoS Adjustment** | LATENCY_SPIKE | Recommend queue management optimization |
+| **Parent Switch Log** | TOPOLOGY_CHANGE | Log event for trend analysis + monitoring |
 
 ---
 
