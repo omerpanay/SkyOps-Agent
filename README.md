@@ -4,7 +4,7 @@
 
 ### Autonomous Network Intelligence for IoT Mesh Networks
 
-**Unified AI Agent • Real-Time Dashboard • Telegram Bot • n8n Orchestration**
+**Unified AI Agent • Real-Time Cooja Simulation • Local Bridge API • n8n Orchestration**
 
 [![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-Dashboard-f97316?style=for-the-badge&logoColor=white)](https://omerpanay.github.io/SkyOps-Agent/dashboard/)
 [![Telegram Bot](https://img.shields.io/badge/📱_Telegram-@SkyOpsAgent__bot-0088cc?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/SkyOpsAgent_bot)
@@ -14,7 +14,7 @@
 
 ---
 
-*An enterprise-grade AI system that autonomously monitors, diagnoses, and responds to anomalies in RPL-based IoT mesh networks — powered by a unified AI Agent with multi-agent reasoning, dual-entry access (Dashboard + Telegram), and real Google Sheets telemetry.*
+*An enterprise-grade AI system that autonomously monitors, diagnoses, and responds to anomalies in RPL-based IoT mesh networks — powered by a unified AI Agent with multi-agent reasoning, dual-entry access (Dashboard + Telegram), and real-time Cooja Simulation telemetry.*
 
 **[🚀 Live Dashboard](https://omerpanay.github.io/SkyOps-Agent/dashboard/)** · **[📱 Telegram Bot](https://t.me/SkyOpsAgent_bot)** · **[📋 Architecture](#architecture)** · **[⚡ Quick Start](#quick-start)**
 
@@ -24,14 +24,16 @@
 
 ## 🎯 What is SkyOps Agent?
 
-SkyOps Agent is an **autonomous network operations (NetOps) AI system** that transforms real IoT mesh network telemetry into actionable intelligence through:
+SkyOps Agent is an **autonomous network operations (NetOps) AI system** that transforms real-time Contiki-NG/Cooja simulation telemetry into actionable intelligence through:
 
 | Capability | Description |
 |---|---|
 | 🤖 **Unified AI Agent** | Single Llama-3.3-70B agent with embedded 3-agent reasoning (Detector → Root Cause → Action) |
 | 📊 **Real-Time Dashboard** | 9 interactive panels with live topology, health gauges, event feed, and AI chat |
+| 🔌 **Python Bridge API** | Zero-dependency REST API server (:8000) that parses simulation logs & calculates KPIs |
+| 🌐 **Docker Proxy Bridge** | Secure host-to-container tunneling to stream serial logs without JVM port conflicts |
 | 📱 **Telegram Bot** | Same AI Agent accessible via [@SkyOpsAgent_bot](https://t.me/SkyOpsAgent_bot) |
-| 💬 **AI Chat Interface** | Conversational assistant powered by real Google Sheets network data |
+| 💬 **AI Chat Interface** | Conversational assistant powered by live network data fed directly into prompt contexts |
 | 🔧 **Self-Healing** | Autonomous recovery actions with confidence-based escalation |
 | 🛡️ **Guardrails** | Confidence scoring (0.0–1.0) with 3-tier escalation logic |
 | 📈 **Progressive Data Feed** | Events stream one-by-one with realistic 2-5s mesh timing |
@@ -48,33 +50,32 @@ SkyOps Agent is an **autonomous network operations (NetOps) AI system** that tra
 │                   SkyOps Agent Architecture                      │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                   │
-│  ┌──────────────┐    ┌──────────────────────────────┐           │
-│  │ Google Sheets │───▶│     n8n Cloud Workflow        │           │
-│  │ (Telemetry)   │    │                                │           │
-│  └──────────────┘    │  ┌──────────┐  ┌───────────┐  │           │
-│                       │  │ GSheets  │  │  Build    │  │           │
-│                       │  │ Read     │─▶│  Context  │  │           │
-│                       │  └──────────┘  └─────┬─────┘  │           │
-│                       │                       │        │           │
-│                       │              ┌────────▼──────┐ │           │
-│                       │              │   AI Agent    │ │           │
-│                       │              │  Llama 3.3    │ │           │
-│                       │              │  70B (Groq)   │ │           │
-│                       │              │               │ │           │
-│                       │              │ ┌───────────┐ │ │           │
-│                       │              │ │ Detector  │ │ │           │
-│                       │              │ │ Root Cause│ │ │           │
-│                       │              │ │ Advisor   │ │ │           │
-│                       │              │ └───────────┘ │ │           │
-│                       │              └───────┬───────┘ │           │
-│                       └──────────────────────┼─────────┘           │
-│                                              │                     │
-│                       ┌──────────────────────┼──────────┐         │
-│                       │                      │          │         │
-│                  ┌────▼─────┐         ┌──────▼──────┐   │         │
-│                  │ Dashboard │         │  Telegram   │   │         │
-│                  │  Chat UI  │         │    Bot      │   │         │
-│                  └──────────┘         └─────────────┘   │         │
+│  ┌───────────────────────┐                                        │
+│  │ Cooja Simulation      │                                        │
+│  │ (Contiki-NG in Docker)│                                        │
+│  └──────────┬────────────┘                                        │
+│             │ Port 60009                                          │
+│             ▼                                                     │
+│  ┌───────────────────────┐                                        │
+│  │ docker_proxy.py (Host)│                                        │
+│  └──────────┬────────────┘                                        │
+│             │ Port 60008                                          │
+│             ▼                                                     │
+│  ┌───────────────────────┐         ┌───────────────────────────┐  │
+│  │ skyops_bridge.py      ├────────▶│    n8n Cloud Workflow     │  │
+│  │ (Rule Engine/REST API)│ Webhook │                           │  │
+│  └──────────┬────────────┘ (Port)  │  ┌───────────┐ ┌────────┐ │  │
+│             │                      │  │ Webhook   │ │ Build  │ │  │
+│             │ REST API             │  │ Trigger   ├─▶ Context│ │  │
+│             │ (:8000/api/all)      │  └───────────┘ └────┬───┘ │  │
+│             ▼                      │                     │     │  │
+│      ┌─────────────┐               │               ┌─────▼───┐ │  │
+│      │  Dashboard  │               │               │ AI Agent│ │  │
+│      │  Chat UI    │               │               │ Llama 3 │ │  │
+│      └──────┬──────┘               │               └─────┬───┘ │  │
+│             │                      └─────────────────────┼─────┘  │
+│             └────────────────────────────────────────────┘         │
+│                                                                   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -97,7 +98,7 @@ Unlike traditional multi-workflow approaches, SkyOps uses a **single unified AI 
 
 | Role | Function | When Activated |
 |---|---|---|
-| 🔍 **Detector** | Anomaly classification (NODE_FAILURE, ROUTING_FAIL, LATENCY_SPIKE, TOPOLOGY_CHANGE, PACKET_LOSS) | Always — part of every analysis |
+| 🔍 **Detector** | Anomaly classification (NODE_FAILURE, ROUTING_FAILURE, LATENCY_SPIKE, TOPOLOGY_CHANGE, PACKET_LOSS) | Always — part of every analysis |
 | 🧬 **Root Cause Analyzer** | Kök neden analizi, temporal pattern, impact scope | When anomalies detected |
 | 💡 **Action Advisor** | Recovery actions, preventive measures, estimated recovery time | After root cause identified |
 
@@ -106,17 +107,15 @@ Unlike traditional multi-workflow approaches, SkyOps uses a **single unified AI 
 ```
 User Question ──▶ Build Context ──▶ AI Agent ──▶ Response
                        ▲               │
-                       │               │ (Google Sheets Tool)
+                       │               │ (n8n Webhook Body)
                        │               ▼
-                Fetch Sheets Data ◀───[Reads/Writes/Deletes]
-                  (GSheets Node)
+                Fetch Bridge Data ◀───[Live telemetry payload]
 ```
 
-1. **Direct Google Sheets Integration**: Every query reads fresh Google Sheets data natively via n8n's Google Sheets node.
-2. **AI-Agent Tool Action**: The AI Agent is equipped with a `Google Sheets Tool` connected directly to its LangChain engine. If a user asks to add, edit, or delete events, the Agent can dynamically call the tool to execute these actions on the sheet in real-time.
-3. **Context Building**: Raw data is parsed into structured network statistics and recent events
-3. **AI Agent**: Llama-3.3-70B analyzes with all 3 agent roles embedded in the system prompt
-4. **Response**: Formatted, actionable analysis delivered to Dashboard or Telegram
+1. **Direct Webhook Integration**: Whenever an anomaly is detected, the Python Bridge POSTs the alert payload to n8n.
+2. **Context Building**: The `Build Context` node parses the incoming live JSON data into formatted statistics, active node health, and recent anomalies.
+3. **AI Agent**: Llama-3.3-70B analyzes the context using the embedded 3-agent prompt roles.
+4. **Response**: Formatted, actionable analysis delivered to Dashboard or Telegram bot.
 
 ### Escalation Logic
 
@@ -130,56 +129,53 @@ User Question ──▶ Build Context ──▶ AI Agent ──▶ Response
 
 ## 📊 Dashboard Features
 
-The dashboard is a **real-time web application** connected to live Google Sheets telemetry and n8n AI Agent.
+The dashboard is a **real-time web application** connected directly to the local Python Bridge API and n8n AI Agent.
 
 | Panel | Description |
 |---|---|
-| 🗺️ **Network Topology** | SVG mesh map with animated links, color-coded node health |
+| 🗺️ **Network Topology** | SVG mesh map with animated links, dynamic parent routing updates, and color-coded node health |
 | 🏥 **Health Gauges** | Circular gauges (0-100) for each node with smooth transitions |
-| 📋 **Live Event Feed** | Progressive event stream with realistic 2-5s IoT mesh timing |
-| 🔔 **Alert History** | Detection alerts with severity badges and confidence scores |
+| 📋 **Live Event Feed** | Progressive event stream parsed from Contiki-NG serial messages |
+| 🔔 **Alert History** | Detection alerts with severity badges, confidence scores, and detection methods |
 | 🤖 **Detection Split** | Donut chart showing Rule Engine vs LLM Agent distribution |
-| 🔧 **Self-Healing Actions** | Autonomous recovery actions with escalation indicators |
-| 📊 **Pipeline Status** | Real-time Google Sheets connection status and statistics |
+| 🔧 **Self-Healing Actions** | Autonomous recovery actions with escalation indicators and live progress tracking |
+| 📊 **Pipeline Status** | Real-time Bridge API connection status and statistics |
 | ⏱️ **Anomaly Timeline** | Horizontal timeline with color-coded event markers |
 | 💬 **AI Chat** | Rich-formatted conversational assistant with severity badges |
 | 📱 **Telegram Banner** | Direct link to [@SkyOpsAgent_bot](https://t.me/SkyOpsAgent_bot) |
-
-### AI Chat — Rich Formatting
-
-Chat responses feature:
-- **Colored severity badges** (CRITICAL, HIGH, MEDIUM, LOW)
-- **Anomaly type highlights** (NODE_FAILURE, LATENCY_SPIKE, etc.)
-- **Structured lists** with proper bullet/numbered formatting
-- **Headers** for organized sections
-- **Source indicator**: 🟢 n8n AI Agent / 🟡 Groq Fallback / 🔴 Offline
 
 ---
 
 ## ⚡ Quick Start
 
-### View Live Demo
-Visit the **[Live Dashboard](https://omerpanay.github.io/SkyOps-Agent/dashboard/)** — no setup required.
+Follow these steps to run the complete simulation and AI pipeline locally:
 
-### Chat via Telegram
-Message **[@SkyOpsAgent_bot](https://t.me/SkyOpsAgent_bot)** — same AI Agent, mobile-friendly.
-
-### Run Locally
-```bash
-git clone https://github.com/omerpanay/SkyOps-Agent.git
-cd SkyOps-Agent
-# Open dashboard/index.html in your browser
+### 1. Run the Cooja Simulation in Docker
+Start your Contiki-NG Docker container running the Cooja network simulator. Inside the Cooja Script Editor, use the following JS script configuration to stream serial logs on port `60009`:
+```javascript
+TIMEOUT(10000000); 
+var server = new java.net.ServerSocket(60009);
+log.log("Cooja JS Stream: 60009 nolu port dinleniyor...\n");
+// (See full nashorn code in docker_proxy.py for loop implementation)
 ```
 
-### Import n8n Workflow
-1. Install [n8n](https://n8n.io) or use n8n Cloud
-2. Import `SkyOps AI Assistant.json` — Unified AI Agent workflow
-3. Configure credentials:
-   - **Groq API** → AI Agent LLM model
-   - **Telegram Bot** → Reply to User node
-4. Click **Publish** to activate
+### 2. Run the Docker Proxy
+To avoid JVM port lock conflicts, run the Python proxy script to forward port `60008` (Host) to `60009` (Docker Container):
+```bash
+python docker_proxy.py
+```
 
-> **Note:** Google Sheets data is accessed and modified securely using your Google credentials.
+### 3. Run the SkyOps Bridge
+Start the main data pipeline bridge to parse logs, run the local REST API, and forward alerts to n8n:
+```bash
+python skyops_bridge.py --cooja-port 60008 --n8n https://omerpanaymsku.app.n8n.cloud/webhook/cooja-logs
+```
+
+### 4. Open the Dashboard
+Open the dashboard file in any browser:
+```
+c:\new\NetOps_Project\dashboard\index.html
+```
 
 ---
 
@@ -189,12 +185,13 @@ cd SkyOps-Agent
 |---|---|
 | **Orchestration** | n8n Cloud (workflow automation) |
 | **LLM** | Groq API (Llama-3.3-70B-Versatile) |
-| **Detection** | Hybrid: Rule Engine + Multi-Agent LLM |
-| **Frontend** | Vanilla HTML/CSS/JS (zero dependencies) |
+| **Detection** | Hybrid: Local Rule Engine + Multi-Agent LLM |
+| **Telemetry Parser** | Custom Python Bridge (Zero-dependency stdlib sockets & threads) |
+| **Proxy Tunneling** | Custom python-docker-proxy bridge |
+| **Frontend** | Vanilla HTML5 / CSS3 / ES6 (zero dependencies, Glassmorphism design) |
 | **Chat** | n8n Webhook + Groq Fallback + Offline mode |
 | **Telegram** | Telegram Bot API (polling trigger) |
-| **Data** | Google Sheets (100+ real alert records) |
-| **Network** | Contiki-NG / Cooja (RPL mesh simulation) |
+| **Network Simulator** | Contiki-NG / Cooja (RPL IPv6 mesh simulation) |
 
 ---
 
@@ -208,6 +205,8 @@ SkyOps-Agent/
 │   └── app.js                  # Progressive data engine + AI chat + formatting
 ├── SkyOps AI Assistant.json    # n8n: Unified AI Agent (Dashboard + Telegram)
 ├── SKYOps Agent.json           # n8n: Multi-Agent Pipeline (reference)
+├── docker_proxy.py             # Docker container serial port tunnel
+├── skyops_bridge.py            # Local parser, rule engine, REST API, & n8n poster
 └── README.md
 ```
 
